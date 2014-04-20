@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.7)
 
 #-----------------------------------------------------------------------------
-set(MODULE_NAME Compare3DVolumes)
+set(MODULE_NAME MosaicViewer)
 
 #-----------------------------------------------------------------------------
 if(NOT Slicer_SOURCE_DIR)

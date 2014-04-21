@@ -191,18 +191,13 @@ class MosaicViewerLogic:
     # make an array with wide screen aspect ratio
     # - e.g. 3 volumes in 3x1 grid
     # - 5 volumes 3x2 with only two volumes in second row
-    c = 1.5 * math.sqrt(len(volumeNodes))
-    columns = math.floor(c)
-    if c != columns:
-      columns += 1
-    if columns > len(volumeNodes):
-      columns = len(volumeNodes)
-    r = len(volumeNodes)/columns
-    rows = math.floor(r)
-    if r != rows:
-      rows += 1
+    N = len(volumeNodes)
+    c = math.sqrt(N)
+    rows = math.floor(c)
+    if N is not rows * rows:
+      columns = math.ceil((N - rows * rows)/rows) + rows
 
-    print "rows: ", rows, '\tcolumns: ', columns
+    print "rows: ", rows, '\tcolumns: ', columns, 'nvolumes: ', N
 
     # construct the XML for the layout
     # - one viewer per volume
@@ -241,13 +236,15 @@ class MosaicViewerLogic:
         volumeNodeID = ""
 
       threeDWidget = layoutManager.threeDWidget(index)
+      threeDView = threeDWidget.threeDView() 
+      viewNode = threeDView.mrmlViewNode()
+      displayNode = volumeNodes[index].GetDisplayNode()
+      displayNode.AddViewNodeID(viewNode.GetID())
+      displayNode.SetVisibility(1)
+      threeDNodesByViewName[viewName] = viewNode 
 
-      # TODO: set the current 3D node with the volumeNodeID 
+      print "Node ", index, ": ", viewNode.GetID(), 'volumeID:', volumeNodeID
 
-      # Get the current view node
-      mrmlNode = threeDWidget.mrmlViewNode() 
-      mrmlNode.SetOrientation(orientation)
-      threeDNodesByViewName[viewName] = mrmlNode
     return threeDNodesByViewName
 
 class MosaicViewerTest(unittest.TestCase):
@@ -299,7 +296,7 @@ class MosaicViewerTest(unittest.TestCase):
     sampleDataLogic = SampleData.SampleDataLogic()
     heads = []
     headNames = []
-    for i in range(3):
+    for i in range(4):
 	    heads.append(sampleDataLogic.downloadMRHead())
 	    headNames.append("head" + str(i))
 

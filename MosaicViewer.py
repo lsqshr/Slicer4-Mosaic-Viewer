@@ -155,6 +155,7 @@ class MosaicViewerLogic:
   def __init__(self):
     self.threeDViewPattern = """
       <item><view class="vtkMRMLViewNode" singletontag="{viewName}">
+        <property name="viewlabel" action="default">{viewName}</property>
       </view></item>
      """
     # use a nice set of colors
@@ -214,9 +215,9 @@ class MosaicViewerLogic:
           viewName = viewNames[index-1]
         except IndexError:
           viewName = '%d-%d' % (row,column)
-        rgb = [int(round(v*255)) for v in self.lookupTable.GetTableValue(index)[:-1]]
-        color = '#%0.2X%0.2X%0.2X' % tuple(rgb)
-        layoutDescription += self.threeDViewPattern.format(viewName=viewName,orientation=orientation,color=color)
+        #rgb = [int(round(v*255)) for v in self.lookupTable.GetTableValue(index)[:-1]]
+        #color = '#%0.2X%0.2X%0.2X' % tuple(rgb)
+        layoutDescription += self.threeDViewPattern.format(viewName=viewName)
         actualViewNames.append(viewName)
         index += 1
       layoutDescription += '</layout></item>\n'
@@ -239,13 +240,21 @@ class MosaicViewerLogic:
       threeDView = threeDWidget.threeDView() 
       viewNode = threeDView.mrmlViewNode()
       displayNode = volumeNodes[index].GetDisplayNode()
-      displayNode.AddViewNodeID(viewNode.GetID())
-      displayNode.SetVisibility(1)
-      threeDNodesByViewName[viewName] = viewNode 
 
-      print "Node ", index, ": ", viewNode.GetID(), 'volumeID:', volumeNodeID
+      if displayNode.IsDisplayableInView(viewNode.GetID()):
+        print "Node:", viewNode.GetID(), ' is displayable for ', viewName 
+        displayNode.AddViewNodeID(viewNode.GetID())
+        displayNode.SetVisibility(True)
+      else:
+        print "Node:", viewNode.GetID(), ' is not displayable for ', viewName 
 
-    return threeDNodesByViewName
+      #threeDNodesByViewName[viewName] = threeDView 
+
+      print "Node ", index, ": ", '\tView Node ID: ', viewNode.GetID(),\
+         '\tview name', viewName, '\tvolumeID:', volumeNodeID
+
+    #return threeDNodesByViewName
+    return
 
 class MosaicViewerTest(unittest.TestCase):
   """

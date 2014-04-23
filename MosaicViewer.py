@@ -78,6 +78,14 @@ class MosaicViewerWidget:
     reloadFormLayout.addWidget(self.reloadAndTestButton)
     self.reloadAndTestButton.connect('clicked()', self.onReloadAndTest)
 
+    # reload and run specific tests
+    scenarios = ('MR',)
+    for scenario in scenarios:
+      button = qt.QPushButton("Reload and Test %s" % scenario)
+      self.reloadAndTestButton.toolTip = "Reload this module and then run the %s self test." % scenario
+      reloadFormLayout.addWidget(button)
+      button.connect('clicked()', lambda s=scenario: self.onReloadAndTest(scenario=s)) 
+
     # Add vertical spacer
     self.layout.addStretch(1)
 
@@ -215,8 +223,6 @@ class MosaicViewerLogic:
           viewName = viewNames[index-1]
         except IndexError:
           viewName = '%d-%d' % (row,column)
-        #rgb = [int(round(v*255)) for v in self.lookupTable.GetTableValue(index)[:-1]]
-        #color = '#%0.2X%0.2X%0.2X' % tuple(rgb)
         layoutDescription += self.threeDViewPattern.format(viewName=viewName)
         actualViewNames.append(viewName)
         index += 1
@@ -224,11 +230,13 @@ class MosaicViewerLogic:
     layoutDescription += '</layout>'
     self.assignLayoutDescription(layoutDescription)
 
+    print "rows: ", rows, '\tcolumns: ', columns, '\nNumber of Volumes: ', N, " Number of View Names", len(actualViewNames)
+
     # put one of the volumes into each view, or none if it should be blank
     threeDNodesByViewName = {}
     layoutManager = slicer.app.layoutManager()
 
-    for index in range(len(actualViewNames)):
+    for index in range(len(volumeNodes)):
       # obtain the name and ID of the current Node
       viewName = actualViewNames[index]
       try:
@@ -236,26 +244,28 @@ class MosaicViewerLogic:
       except IndexError:
         volumeNodeID = ""
 
-      threeDWidget = layoutManager.threeDWidget(index)
+      threeDWidget = layoutManager.threeDWidget(index + 1)
       threeDView = threeDWidget.threeDView() 
       viewNode = threeDView.mrmlViewNode()
-      displayNode = volumeNodes[index].GetDisplayNode()
 
-      if displayNode.IsDisplayableInView(viewNode.GetID()):
-        print "Node:", viewNode.GetID(), ' is displayable for ', viewName 
-        displayNode.AddViewNodeID(viewNode.GetID())
-        displayNode.SetVisibility(True)
-      else:
-        print "Node:", viewNode.GetID(), ' is not displayable for ', viewName 
-
-      #threeDNodesByViewName[viewName] = threeDView 
+      # use volumerendering module to make the volume rendering display node
+      logic = slicer.modules.volumerendering.logic()
+      displayNode = logic.CreateVolumeRenderingDisplayNode()
+      slicer.mrmlScene.AddNode(displayNode)      
+      displayNode.UnRegister(logic)
+      displayNode.AddViewNodeID(viewNode.GetID())
+      logic.UpdateDisplayNodeFromVolumeNode(displayNode, volumeNodes[index])
+      displayNode.SetVisibility(True)
+      volumeNodes[index].AddAndObserveDisplayNodeID(displayNode.GetID())
 
       print "Node ", index, ": ", '\tView Node ID: ', viewNode.GetID(),\
-         '\tview name', viewName, '\tvolumeID:', volumeNodeID
+         '\tview name', viewName, '\tvolumeID:', volumeNodeID, 'displayNode Visible:', \
+         displayNode.GetVisibility()
 
-    #return threeDNodesByViewName
-    return
+      threeDNodesByViewName[viewName] = threeDView 
 
+    return threeDNodesByViewName
+    
 class MosaicViewerTest(unittest.TestCase):
   """
   This is the test case for your scripted module.
@@ -286,10 +296,18 @@ class MosaicViewerTest(unittest.TestCase):
   def runTest(self,scenario=None):
     """Run as few or as many tests as needed here.
     """
-    #self.setUp()
-    self.test_MosaicViewer1()
+    if scenario == "MR":
+      self.test_MosaicViewer_MR()
+    elif scenario == "DTI":
+      self.test_MosaicViewer_DTI()
+    elif scenario == "MRDTI":
+      self.test_MosaicViewer_MR_DTI()
+    else:
+      self.test_MosaicViewer_MR()
+      self.test_MosaicViewer_MR_DTI()
 
-  def test_MosaicViewer1(self):
+
+  def test_MosaicViewer_MR(self):
     """ Test modes with 3 volumes.
     """
     m = slicer.util.mainWindow()
@@ -305,11 +323,13 @@ class MosaicViewerTest(unittest.TestCase):
     sampleDataLogic = SampleData.SampleDataLogic()
     heads = []
     headNames = []
-    for i in range(4):
+    for i in range(3):
 	    heads.append(sampleDataLogic.downloadMRHead())
 	    headNames.append("head" + str(i))
 
+    for i in range(2):
+      heads.append(sampleDataLogic.downloadMRBrainTumor1())
+      headNames.append("tumor" + str(i))
 
     logic = MosaicViewerLogic()
-    self.delayDisplay("first with 4 volumes")
     logic.viewerPerVolume(volumeNodes=heads, viewNames=headNames)

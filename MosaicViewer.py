@@ -16,7 +16,8 @@ class MosaicViewer:
     This module helps organize layouts and volume compositing to help compare 3D images
     """
     parent.acknowledgementText = """blah blah
-""" # replace with organization, grant and thanks.
+    """ 
+    # replace with organization, grant and thanks.
     self.parent = parent
 
     # Add this test to the SelfTest module's list for discovery when the module
@@ -52,6 +53,30 @@ class MosaicViewerWidget:
 
   def setup(self):
     # Instantiate and connect widgets ...
+
+    #
+    # Render Data Area
+    #
+    renderCollapsibleButton = ctk.ctkCollapsibleButton()
+    renderCollapsibleButton.text = "Render Volumes && Models"
+    self.layout.addWidget(renderCollapsibleButton)
+    renderFormLayout = qt.QFormLayout(renderCollapsibleButton)
+
+    #
+    # Load all models in mrml scene
+    #
+    self.renderAllModelsButton = qt.QPushButton("Load All Models")
+    self.renderAllModelsButton.toolTip = "Load all models in the mrml scene in Mosaic Viewer"
+    renderFormLayout.addWidget(self.renderAllModelsButton)
+    self.renderAllModelsButton.connect('clicked()', lambda p='vtkMRMLModelNode*' : self.onRenderAllNodes(pattern=p))
+
+    #
+    # Load all volumes in mrml scene
+    #
+    self.renderAllVolumesButton = qt.QPushButton("Load All Volumes")
+    self.renderAllVolumesButton.toolTip = "Load all volumess in the mrml scene in Mosaic Viewer"
+    renderFormLayout.addWidget(self.renderAllVolumesButton)
+    self.renderAllVolumesButton.connect('clicked()', lambda p='vtkMRMLVolumeNode*' : self.onRenderAllNodes(pattern=p))
 
     #
     # Reload and Test area
@@ -91,6 +116,10 @@ class MosaicViewerWidget:
       self.reloadAndTestButton.toolTip = "Reload this module and then run the %s self test." % scenario
       reloadFormLayout.addWidget(button)
       button.connect('clicked()', lambda s=scenario: self.onReloadAndTest(scenario=s)) 
+
+    # Add vertical spacer
+    #self.layout.addStretch(1)
+
 
     # Add vertical spacer
     self.layout.addStretch(1)
@@ -157,6 +186,9 @@ class MosaicViewerWidget:
       qt.QMessageBox.warning(slicer.util.mainWindow(),
           "Reload and Test", 'Exception!\n\n' + str(e) + "\n\nSee Python Console for Stack Trace")
 
+  def onRenderAllNodes(self, pattern):
+    logic = MosaicViewerLogic()
+    logic.renderAllNodes(pattern)
 
 #
 # MosaicViewerLogic
@@ -231,6 +263,8 @@ class MosaicViewerLogic:
     """ Load each volume in the scene into its own
     3D viewer and link them all together.
     """
+    print "view names:", viewNames
+
     if not volumeNodes:
       volumeNodes = slicer.util.getNodes('*VolumeNode*').values()
 
@@ -266,7 +300,7 @@ class MosaicViewerLogic:
       volumeNodes[index].AddAndObserveDisplayNodeID(displayNode.GetID())
 
       print "Node ", index, ": ", '\tView Node ID: ', viewNode.GetID(),\
-         '\tview name', viewName, '\tvolumeID:', volumeNodeID, 'displayNode Visible:', \
+         '\tview name', viewName, '\tvolumeID:', volumeNodeID, '\tdisplayNode Visible:', \
          displayNode.GetVisibility()
 
       threeDNodesByViewName[viewName] = threeDView 
@@ -315,6 +349,16 @@ class MosaicViewerLogic:
       threeDNodesByViewName[viewName] = threeDView 
 
     return threeDNodesByViewName
+
+  def renderAllNodes(self, pattern = "vtkMRMLModelNode*"):
+    '''
+    Search all models which are currently loaded in the mrml scene and 
+    render them in the a grid view
+    '''
+    nodesDict = slicer.util.getNodes(pattern)
+    nodes = [n for n in nodesDict.values() if "Volume" not in n.GetName()]
+    print "Found ", len(nodes), " model nodes"
+    self.viewerPerModel(modelNodes=nodes, viewNames=[n.GetName() for n in nodes])
     
 class MosaicViewerTest(unittest.TestCase):
   """
@@ -395,17 +439,37 @@ class MosaicViewerTest(unittest.TestCase):
 
     # try two models
     slicer.util.loadModel('D:\\data\\localworkspace\\Mosaic\\Resources\\bundle1.vtk') # change the path to your local path
+    slicer.util.loadModel('D:\\data\\localworkspace\\Mosaic\\Resources\\wholefibre.vtk') # change the path to your local path
+    slicer.util.loadModel('D:\\data\\localworkspace\\Mosaic\\Resources\\loosefibre.vtk') # change the path to your local path
 
     heads.append(slicer.util.getNode('bundle1'))
     headNames.append("tumor bundle")
 
-    slicer.util.loadModel('D:\\data\\localworkspace\\Mosaic\\Resources\\wholefibre.vtk') # change the path to your local path
     heads.append(slicer.util.getNode('wholefibre'))
     headNames.append("wholefibre")
 
-    slicer.util.loadModel('D:\\data\\localworkspace\\Mosaic\\Resources\\loosefibre.vtk') # change the path to your local path
     heads.append(slicer.util.getNode('loosefibre'))
     headNames.append("loosefibre")
+
+
+    heads.append(slicer.util.getNode('wholefibre'))
+    headNames.append("wholefibre2")
+
+    heads.append(slicer.util.getNode('loosefibre'))
+    headNames.append("loosefibre2")
+
+    heads.append(slicer.util.getNode('bundle1'))
+    headNames.append("tumor bundle2")
+
+
+    heads.append(slicer.util.getNode('loosefibre'))
+    headNames.append("loosefibre3")
+
+    heads.append(slicer.util.getNode('bundle1'))
+    headNames.append("tumor bundle3")
+    
+    heads.append(slicer.util.getNode('wholefibre'))
+    headNames.append("wholefibre3")
 
     logic = MosaicViewerLogic()
     logic.viewerPerModel(modelNodes=heads, viewNames=headNames)

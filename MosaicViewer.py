@@ -259,93 +259,60 @@ class MosaicViewerLogic:
 
     return actualViewNames
 
-  def viewerPerVolume(self, volumeNodes=None, viewNames=[]):
+  def viewerPerNode(self, nodes=None, viewNames=[], nodeType="Volume"):
     """ Load each volume in the scene into its own
     3D viewer and link them all together.
     """
     print "view names:", viewNames
 
-    if not volumeNodes:
-      volumeNodes = slicer.util.getNodes('*VolumeNode*').values()
+    if not nodes:
+      nodes = slicer.util.getNodes('*VolumeNode*').values()
 
-    if len(volumeNodes) == 0:
+    if len(nodes) == 0:
       return
 
-    actualViewNames = self.makeLayout(volumeNodes, viewNames)
+    actualViewNames = self.makeLayout(nodes, viewNames)
 
     # put one of the volumes into each view, or none if it should be blank
     threeDNodesByViewName = {}
     layoutManager = slicer.app.layoutManager()
 
-    for index in range(len(volumeNodes)):
+    for index in range(len(nodes)):
       # obtain the name and ID of the current Node
       viewName = actualViewNames[index]
       try:
-        volumeNodeID = volumeNodes[index].GetID()
+        nodeID = nodes[index].GetID()
       except IndexError:
-        volumeNodeID = ""
+        nodeID = ""
       # get the index-th 3D view node
       threeDWidget = layoutManager.threeDWidget(index + 1)
       threeDView = threeDWidget.threeDView() 
       viewNode = threeDView.mrmlViewNode()
 
       # use volumerendering module to make the volume rendering display node
-      logic = slicer.modules.volumerendering.logic()
-      displayNode = logic.CreateVolumeRenderingDisplayNode()
-      slicer.mrmlScene.AddNode(displayNode)      
-      displayNode.UnRegister(logic)
-      displayNode.AddViewNodeID(viewNode.GetID())
-      logic.UpdateDisplayNodeFromVolumeNode(displayNode, volumeNodes[index])
-      displayNode.SetVisibility(True)
-      volumeNodes[index].AddAndObserveDisplayNodeID(displayNode.GetID())
+      if nodeType == "Volume":
+        logic = slicer.modules.volumerendering.logic()
+        displayNode = logic.CreateVolumeRenderingDisplayNode()
+        slicer.mrmlScene.AddNode(displayNode)      
+        displayNode.UnRegister(logic)
+        displayNode.AddViewNodeID(viewNode.GetID())
+        logic.UpdateDisplayNodeFromVolumeNode(displayNode, nodes[index])
+        displayNode.SetVisibility(True)
+        nodes[index].AddAndObserveDisplayNodeID(displayNode.GetID())
+      elif nodeType == "Model":
+        # use models module to render the display node of this model
+        logic = slicer.modules.models.logic()
+        displayNode = nodes[index].GetDisplayNode()
+        displayNode.AddViewNodeID(viewNode.GetID())
+        slicer.mrmlScene.AddNode(displayNode)      
+        nodes[index].AddAndObserveDisplayNodeID(displayNode.GetID())
+      else:
+        raise Exception("Unknown Node Type")
 
       print "Node ", index, ": ", '\tView Node ID: ', viewNode.GetID(),\
-         '\tview name', viewName, '\tvolumeID:', volumeNodeID, '\tdisplayNode Visible:', \
+         '\tview name', viewName, '\tvolumeID:', nodeID, '\tdisplayNode Visible:', \
          displayNode.GetVisibility()
 
-      threeDNodesByViewName[viewName] = threeDView 
-
-    return threeDNodesByViewName
-
-  def viewerPerModel(self, modelNodes=None, viewNames=[]):
-
-    """ Load each model in the scene into its own
-    3D viewer and link them all together.
-    """
-    if not modelNodes:
-      modelNodes = slicer.util.getNodes('*VolumeNode*').values()
-
-    if len(modelNodes) == 0:
-      return
-
-    actualViewNames = self.makeLayout(modelNodes, viewNames)
-
-    # put one of the volumes into each view, or none if it should be blank
-    threeDNodesByViewName = {}
-    layoutManager = slicer.app.layoutManager()
-
-    for index in range(len(modelNodes)):
-      # obtain the name and ID of the current Node
-      viewName = actualViewNames[index]
-
-      # get the index-th 3D view node
-      threeDWidget = layoutManager.threeDWidget(index + 1)
-      threeDView = threeDWidget.threeDView() 
-      viewNode = threeDView.mrmlViewNode()
-
-      # use models module to render the display node of this model
-      logic = slicer.modules.models.logic()
-      displayNode = modelNodes[index].GetDisplayNode()
-      displayNode.AddViewNodeID(viewNode.GetID())
-      slicer.mrmlScene.AddNode(displayNode)      
-      modelNodes[index].AddAndObserveDisplayNodeID(displayNode.GetID())
-      #displayNode.SetVisibility(True)
-
-      print "Node ", index, ": ", '\tView Node ID: ', viewNode.GetID(),\
-         '\tview name', viewName, 'displayNode Visible:', \
-         displayNode.GetVisibility()
-
-      threeDView.resetFocalPoint()
       threeDNodesByViewName[viewName] = threeDView 
 
     return threeDNodesByViewName
@@ -356,9 +323,11 @@ class MosaicViewerLogic:
     render them in the a grid view
     '''
     nodesDict = slicer.util.getNodes(pattern)
-    nodes = [n for n in nodesDict.values() if "Volume" not in n.GetName()]
-    print "Found ", len(nodes), " model nodes"
-    self.viewerPerModel(modelNodes=nodes, viewNames=[n.GetName() for n in nodes])
+    nodes = [n for n in nodesDict.values() if "Slice" not in n.GetName()]
+
+    nodeType = lambda nt : "Model" if pattern=='vtkMRMLModelNode*' else "Volume"
+    self.viewerPerNode(nodes=nodes, viewNames=[n.GetName() for n in nodes],\
+       nodeType=nodeType(pattern))
     
 class MosaicViewerTest(unittest.TestCase):
   """
@@ -428,7 +397,7 @@ class MosaicViewerTest(unittest.TestCase):
       headNames.append("tumor" + str(i))
 
     logic = MosaicViewerLogic()
-    logic.viewerPerVolume(volumeNodes=heads, viewNames=headNames)
+    logic.viewerPerNode(nodes=heads, viewNames=headNames, nodeType="Volume")
 
   def test_MosaicViewer_DTI(self):
     m = slicer.util.mainWindow()
@@ -438,9 +407,9 @@ class MosaicViewerTest(unittest.TestCase):
     headNames = []
 
     # try two models
-    slicer.util.loadModel('D:\\data\\localworkspace\\Mosaic\\Resources\\bundle1.vtk') # change the path to your local path
-    slicer.util.loadModel('D:\\data\\localworkspace\\Mosaic\\Resources\\wholefibre.vtk') # change the path to your local path
-    slicer.util.loadModel('D:\\data\\localworkspace\\Mosaic\\Resources\\loosefibre.vtk') # change the path to your local path
+    slicer.util.loadModel('D:\\data\\localworkspace\\Mosaic\\Resources\\SampleTracts\\bundle1.vtk') # change the path to your local path
+    slicer.util.loadModel('D:\\data\\localworkspace\\Mosaic\\Resources\\SampleTracts\\wholefibre.vtk') # change the path to your local path
+    slicer.util.loadModel('D:\\data\\localworkspace\\Mosaic\\Resources\\SampleTracts\\loosefibre.vtk') # change the path to your local path
 
     heads.append(slicer.util.getNode('bundle1'))
     headNames.append("tumor bundle")
@@ -472,4 +441,4 @@ class MosaicViewerTest(unittest.TestCase):
     headNames.append("wholefibre3")
 
     logic = MosaicViewerLogic()
-    logic.viewerPerModel(modelNodes=heads, viewNames=headNames)
+    logic.viewerPerNode(nodes=heads, viewNames=headNames, nodeType="Model")

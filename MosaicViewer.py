@@ -112,7 +112,6 @@ class MosaicViewerWidget:
       reloadFormLayout.addWidget(button)
       button.connect('clicked()', lambda s = scenario: self.onReloadAndTest(scenario = s))
 
-    '''
     #
     # Input Data Selection Area
     #
@@ -162,7 +161,7 @@ class MosaicViewerWidget:
     changeLayoutFrame.layout().addWidget(chooseRowFrame)
     chooseColumnFrame, chooseColumnSlider, chooseColumnSliderSpinBox = numericInputFrame(self.parent, "Number of Columns:", "Choose Number of Columns", 0, 20, 1, 1)
     changeLayoutFrame.layout().addWidget(chooseColumnFrame)
-    '''
+
 
     # TODO: add two radials, one for default and one for customized layout. If 'customized' is selected, generate a grid to enable the users to customize the viewer layout.
     # chooseCustomizedTable = qt.QTableWidget(5, 5)
@@ -398,7 +397,7 @@ class MosaicViewerLogic:
 
     return threeDNodesByViewName
 
-  
+
   def renderAllNodes(self, pattern = "vtkMRMLModelNode*"):
     '''
     Search all models which are currently loaded in the mrml scene and 
@@ -410,57 +409,14 @@ class MosaicViewerLogic:
     self.viewerPerNode(nodes = nodes, viewNames = [n.GetName() for n in nodes],\
        nodeType = nodeType(pattern))
 
-
   def renderAllSceneViewNodes(self):
-      # Find loaded sceneviews
-      nodes_dict = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
-      sv_nodes = [n for n in nodes_dict.values() if "Slice" not in n.GetName()]
-
-      # Make the layout according to the # scene view nodes
-      self.makeLayout(sv_nodes, [n.GetName() for n in sv_nodes])
-      layoutManager = slicer.app.layoutManager()
-
-      # Get all the model nodes in the scene
-      if len(sv_nodes) == 0 :
-        return 
-
-      scene = sv_nodes[0].GetStoredScene()
-      model_collection = scene.GetNodesByClass('vtkMRMLModelNode')
-      nmodel = model_collection.GetNumberOfItems() 
-      iter = model_collection.NewIterator()
-
-      print nmodel
-
-      for s in range(len(sv_nodes)):
-        sv_nodes[s].GetAddToScene()
-        iter.GoToFirstItem()
-
-        for m in range(nmodel):
-          print m
-          modeli = iter.GetCurrentObject()
-
-          # get the index-th 3D view node
-          threeDWidget = layoutManager.threeDWidget(s)
-          threeDView = threeDWidget.threeDView() 
-          viewNode = threeDView.mrmlViewNode()
-
-          is_model_in_sceneview = sv_nodes[s].IncludeNodeInSceneView(modeli)
-          print 'is model', modeli.GetID(), ' in ', sv_nodes[s].GetID(), ' ? ', is_model_in_sceneview
-
-          if sv_nodes[s].IncludeNodeInSceneView(modeli) == True:
-            modeli.GetDisplayNode().AddViewNodeID(viewNode.GetID())
-            #modeli.SetVisibility(True)
-            #print viewNode.GetID(), ' is added to ', modeli.GetID()
-
-          else:
-            modeli.GetDisplayNode().RemoveViewNodeID(viewNode.GetID())
-            #print viewNode.GetID(), ' is removed to ', modeli.GetID()
-            #modeli.SetVisibility(False)
-
-          iter.GoToNextItem()
-
-
-
+      nodesDict = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
+      nodes = [n for n in nodesDict.values() if "Slice" not in n.GetName()]
+      nodeType = "SceneView"
+      viewNames = [n.GetName() for n in nodes]
+      nodes.sort()
+      viewNames.sort()
+      self.viewerPerNode(nodes = nodes, viewNames = viewNames, nodeType = nodeType)
     
 class MosaicViewerTest(unittest.TestCase):
   """

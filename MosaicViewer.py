@@ -429,7 +429,6 @@ class MosaicViewerLogic:
       if len(sv_nodes) == 0 :
         return 
 
-
       for s in range(len(sv_nodes)):
         scene = sv_nodes[s].GetStoredScene()
         model_collection = scene.GetNodesByClass('vtkMRMLModelNode')

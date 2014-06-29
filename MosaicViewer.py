@@ -283,6 +283,10 @@ class MosaicViewerLogic:
     self.colors = slicer.util.getNode('GenericColors')
     self.lookupTable = self.colors.GetLookupTable()
 
+  def updateNViewNode(self):
+    lviewnode = slicer.util.getNodes("*ViewNode*")
+    self.nViewNode =  len(lviewnode.keys())
+
   def assignLayoutDescription(self,layoutDescription):
     """assign the xml to the user-defined layout slot"""
     layoutNode = slicer.util.getNode('*LayoutNode*')
@@ -293,6 +297,8 @@ class MosaicViewerLogic:
     layoutNode.SetViewArrangement(layoutNode.SlicerLayoutUserView)
 
   def makeLayout(self, nodes, viewNames):
+    self.updateNViewNode()
+
     import math
     # make an default display layout array, e.g.:
     # nvolumes = 3 -> 2 x 2 (nrows = ncolumes, with only one volume in second row)
@@ -326,10 +332,6 @@ class MosaicViewerLogic:
       layoutDescription += '</layout></item>\n'
     layoutDescription += '</layout>'
     self.assignLayoutDescription(layoutDescription)
-
-    print '\nrows: ', nRows, '\tcolumns: ', nColumns, '\nNumber of Volumes: ', nNodes, '\nNumber of View Names:', len(actualViewNames), '\n'
-    print actualViewNames
-    print '\n'
 
     return actualViewNames
 
@@ -410,6 +412,24 @@ class MosaicViewerLogic:
     self.viewerPerNode(nodes = nodes, viewNames = [n.GetName() for n in nodes],\
        nodeType = nodeType(pattern))
 
+  def _getViewIndex(self, sceneViewIndex, nSceneViewNode):
+    '''
+    get the starting index of view node by filtering rubbish
+    '''
+    lViewNode = slicer.util.getNodes('vtkMRMLViewNode*');
+    keys2Remove = []
+
+    for key in lViewNode:
+      viewName = lViewNode[key].GetName()
+      if viewName in ["Red", "Yellow", "Green"]:
+        keys2Remove.append(key)
+
+    for key in keys2Remove:
+      lViewNode.pop(key)
+
+    print '#view nodes after removing slices:', lViewNode.keys()
+    return len(lViewNode.keys()) - (nSceneViewNode - sceneViewIndex)
+
 
   def renderAllSceneViewNodes(self):
       # Find loaded sceneviews
@@ -426,8 +446,6 @@ class MosaicViewerLogic:
 
       for s in range(len(sv_nodes)):
         sceneview = sv_nodes[s]
-        
-        print '\n', sceneview.GetName() , ': \n'
 
         # get the models and fiber bundles
         model_collection = sv_nodes[s].GetNodesByClass('vtkMRMLModelNode')
@@ -436,10 +454,14 @@ class MosaicViewerLogic:
         nfiber = fiber_collection.GetNumberOfItems()
       
         # get the index-th 3D view node
-        threeDWidget = layoutManager.threeDWidget(s)
+        viewIndex = self._getViewIndex(s, len(sv_nodes))
+        print viewIndex
+        threeDWidget = layoutManager.threeDWidget(viewIndex)
         threeDView = threeDWidget.threeDView() 
         viewNode = threeDView.mrmlViewNode()
-        print viewNode.GetName()
+
+        # DEBUG
+        print '\n', sceneview.GetName(), ':', viewNode.GetName() 
 
         # initialize the model and fiber iterators
         iter_model = model_collection.NewIterator()
@@ -448,24 +470,26 @@ class MosaicViewerLogic:
         for m in range(nmodel):
           modeli = iter_model.GetCurrentObject()
           print 'Add model ', modeli.GetName(), 'to ', viewNode.GetName()
+          displayNode = modeli.GetDisplayNode()
+          displayNode.RemoveAllViewNodeIDs()
+          print modeli.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
+          modeli.AddAndObserveDisplayNodeID(displayNode.GetID()) 
+          displayNode.AddViewNodeID(viewNode.GetID())
+          displayNode.SetVisibility(True)
           iter_model.GoToNextItem()
-          display_node = modeli.GetDisplayNode()
-          nviewnodes = vdisplay_node.getNumberofViewNodeIDs()
-          for nv in range(x)
+          print 'After Adding ID, ',modeli.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
+          modeli.AddAndObserveDisplayNodeID(displayNode.GetID()) 
 
-          modeli.AddAndObserveDisplayNodeID(display_node.GetID())
-          display_node.AddViewNodeID(viewNode.GetID())
-          display_node.SetVisibility(True)
-        
         for f in range(nfiber):
           fiberi = iter_fiber.GetCurrentObject()
           print 'Add fiber ', fiberi.GetName(), 'to ', viewNode.GetName()
+          displayNode = fiberi.GetDisplayNode()
+          displayNode.RemoveAllViewNodeIDs()
+          fiberi.AddAndObserveDisplayNodeID(displayNode.GetID()) 
+          displayNode.AddViewNodeID(viewNode.GetID())
+          displayNode.SetVisibility(True)
+          print 'After Adding ID',fiberi.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
           iter_fiber.GoToNextItem()
-          display_node = fiberi.GetDisplayNode()
-          fiberi.AddAndObserveDisplayNodeID(display_node.GetID()) 
-          display_node.AddViewNodeID(viewNode.GetID())
-          display_node.SetVisibility(True)
-
     
 class MosaicViewerTest(unittest.TestCase):
   """

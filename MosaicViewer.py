@@ -260,12 +260,17 @@ class MosaicViewerWidget:
 
   def onApply(self):
       logic = MosaicViewerLogic()
-      logic.renderAllSceneViewNodes()
+      #logic.renderAllSceneViewNodes()
+      logic.saveSnapshotDict()
+
+class MosaicSceneViewNode(vtkMRMLSceneViewNode):
+  
+  def __init__(self, snapshotDict, sceneView):
+    self.snapshotDict = 
 
 #
 # MosaicViewerLogic
 #
-
 class MosaicViewerLogic:
   """This class should implement all the actual
   computation done by your module.  The interface
@@ -424,14 +429,15 @@ class MosaicViewerLogic:
       if len(sv_nodes) == 0 :
         return 
 
-      scene = sv_nodes[0].GetStoredScene()
-      model_collection = scene.GetNodesByClass('vtkMRMLModelNode')
-      nmodel = model_collection.GetNumberOfItems() 
-      iter = model_collection.NewIterator()
-
-      print nmodel
 
       for s in range(len(sv_nodes)):
+        scene = sv_nodes[s].GetStoredScene()
+        model_collection = scene.GetNodesByClass('vtkMRMLModelNode')
+        nmodel = model_collection.GetNumberOfItems() 
+        iter = model_collection.NewIterator()
+
+        print nmodel
+
         sv_nodes[s].GetAddToScene()
         iter.GoToFirstItem()
 
@@ -459,7 +465,40 @@ class MosaicViewerLogic:
 
           iter.GoToNextItem()
 
+  def saveMosaicSceneView(self):
+    # Find the scene  
+    nodes_dict = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
+    sv_nodes = [n for n in nodes_dict.values() if "Slice" not in n.GetName()]
+    scene = sv_nodes[0].GetScene()
 
+    # Find all loaded models
+    models = scene.GetNodesByClass('vtkMRMLModelNode')
+    snapshotDict = {}
+    nmodel = models.GetNumberOfItems()
+    iter = models.NewIterator()
+
+    for m in range(nmodel):
+      model = iter.GetCurrentObject()
+      iter.GoToNextItem()
+      #print dir(model.GetDisplayNode())
+
+      displayNode = model.GetDisplayNode() 
+      nviewNodeID = displayNode.GetNumberOfViewNodeIDs()
+      IDs = []
+      allViewNodes = slicer.util.getNodes('*ViewNode*')
+      print 'allViewNodes:', allViewNodes
+
+      if nviewNodeID is 0:
+        nviewNodeID = len(allViewNodes)
+        IDs = allViewNodes.keys()
+        snapshotDict[model.GetID()] = IDs 
+      else:
+        for v in range(nviewNodeID):
+           IDs.append(displayNode.GetNthViewNodeID(v))
+         
+        snapshotDict[model.GetID()] = IDs;
+
+      # Create one MosaicSceneView to be saved
 
     
 class MosaicViewerTest(unittest.TestCase):

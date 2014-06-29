@@ -424,42 +424,47 @@ class MosaicViewerLogic:
       if len(sv_nodes) == 0 :
         return 
 
-      scene = sv_nodes[0].GetStoredScene()
-      model_collection = scene.GetNodesByClass('vtkMRMLModelNode')
-      nmodel = model_collection.GetNumberOfItems() 
-      iter = model_collection.NewIterator()
-
-      print nmodel
-
       for s in range(len(sv_nodes)):
-        sv_nodes[s].GetAddToScene()
-        iter.GoToFirstItem()
+        sceneview = sv_nodes[s]
+        
+        print '\n', sceneview.GetName() , ': \n'
+
+        # get the models and fiber bundles
+        model_collection = sv_nodes[s].GetNodesByClass('vtkMRMLModelNode')
+        fiber_collection = sv_nodes[s].GetNodesByClass('vtkMRMLFiberBundleNode')
+        nmodel = model_collection.GetNumberOfItems()
+        nfiber = fiber_collection.GetNumberOfItems()
+      
+        # get the index-th 3D view node
+        threeDWidget = layoutManager.threeDWidget(s)
+        threeDView = threeDWidget.threeDView() 
+        viewNode = threeDView.mrmlViewNode()
+        print viewNode.GetName()
+
+        # initialize the model and fiber iterators
+        iter_model = model_collection.NewIterator()
+        iter_fiber = fiber_collection.NewIterator()
 
         for m in range(nmodel):
-          print m
-          modeli = iter.GetCurrentObject()
+          modeli = iter_model.GetCurrentObject()
+          print 'Add model ', modeli.GetName(), 'to ', viewNode.GetName()
+          iter_model.GoToNextItem()
+          display_node = modeli.GetDisplayNode()
+          nviewnodes = vdisplay_node.getNumberofViewNodeIDs()
+          for nv in range(x)
 
-          # get the index-th 3D view node
-          threeDWidget = layoutManager.threeDWidget(s)
-          threeDView = threeDWidget.threeDView() 
-          viewNode = threeDView.mrmlViewNode()
-
-          is_model_in_sceneview = sv_nodes[s].IncludeNodeInSceneView(modeli)
-          print 'is model', modeli.GetID(), ' in ', sv_nodes[s].GetID(), ' ? ', is_model_in_sceneview
-
-          if sv_nodes[s].IncludeNodeInSceneView(modeli) == True:
-            modeli.GetDisplayNode().AddViewNodeID(viewNode.GetID())
-            #modeli.SetVisibility(True)
-            #print viewNode.GetID(), ' is added to ', modeli.GetID()
-
-          else:
-            modeli.GetDisplayNode().RemoveViewNodeID(viewNode.GetID())
-            #print viewNode.GetID(), ' is removed to ', modeli.GetID()
-            #modeli.SetVisibility(False)
-
-          iter.GoToNextItem()
-
-
+          modeli.AddAndObserveDisplayNodeID(display_node.GetID())
+          display_node.AddViewNodeID(viewNode.GetID())
+          display_node.SetVisibility(True)
+        
+        for f in range(nfiber):
+          fiberi = iter_fiber.GetCurrentObject()
+          print 'Add fiber ', fiberi.GetName(), 'to ', viewNode.GetName()
+          iter_fiber.GoToNextItem()
+          display_node = fiberi.GetDisplayNode()
+          fiberi.AddAndObserveDisplayNodeID(display_node.GetID()) 
+          display_node.AddViewNodeID(viewNode.GetID())
+          display_node.SetVisibility(True)
 
     
 class MosaicViewerTest(unittest.TestCase):

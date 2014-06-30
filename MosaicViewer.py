@@ -517,7 +517,7 @@ class MosaicViewerLogic:
             modeli.AddAndObserveDisplayNodeID(displayNode.GetID()) 
             displayNode.AddViewNodeID(viewNode.GetID())
             displayNode.SetVisibility(False)
-            modeli.SetDisplayVisibility(0)
+            modeli.SetDisplayVisibility(1)
 
             print 'Add model ', modeli.GetName(), 'to ', viewNode.GetName()
             #print modeli.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()

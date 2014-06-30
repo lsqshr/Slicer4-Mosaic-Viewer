@@ -432,6 +432,9 @@ class MosaicViewerLogic:
 
 
   def renderAllSceneViewNodes(self):
+      print '=================================='
+      scene = slicer.mrmlScene
+
       # Find loaded sceneviews
       nodes_dict = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
       sv_nodes = [n for n in nodes_dict.values() if "Slice" not in n.GetName()]
@@ -447,15 +450,22 @@ class MosaicViewerLogic:
       for s in range(len(sv_nodes)):
         sceneview = sv_nodes[s]
 
-        # get the models and fiber bundles
+        # get all model and fibre nodes from scene
+        scene_model_collection = scene.GetNodesByClass('vtkMRMLModelNode')
+        scene_fibre_collection = scene.GetNodesByClass('vtkMRMLfibreBundleNode')
+        n_scene_model          = scene_model_collection.GetNumberOfItems()
+        n_scene_fibre          = scene_fibre_collection.GetNumberOfItems()
+
+        # get the models and fibre bundles from sceneview
         model_collection = sv_nodes[s].GetNodesByClass('vtkMRMLModelNode')
-        fiber_collection = sv_nodes[s].GetNodesByClass('vtkMRMLFiberBundleNode')
-        nmodel = model_collection.GetNumberOfItems()
-        nfiber = fiber_collection.GetNumberOfItems()
+        fibre_collection = sv_nodes[s].GetNodesByClass('vtkMRMLfibreBundleNode')
+        n_sceneview_model = model_collection.GetNumberOfItems()
+        n_sceneview_fibre = fibre_collection.GetNumberOfItems()
       
         # get the index-th 3D view node
+        # TODO: not sure if the index is right
         viewIndex = self._getViewIndex(s, len(sv_nodes))
-        print viewIndex
+        #print viewIndex
         threeDWidget = layoutManager.threeDWidget(viewIndex)
         threeDView = threeDWidget.threeDView() 
         viewNode = threeDView.mrmlViewNode()
@@ -463,33 +473,77 @@ class MosaicViewerLogic:
         # DEBUG
         print '\n', sceneview.GetName(), ':', viewNode.GetName() 
 
-        # initialize the model and fiber iterators
-        iter_model = model_collection.NewIterator()
-        iter_fiber = fiber_collection.NewIterator()
+        # initialize the model and fibre iterators
+        iter_scene_model = scene_model_collection.NewIterator()
+        iter_scene_fibre = scene_fibre_collection.NewIterator()
+        iter_sceneview_model = scene_model_collection.NewIterator()
+        iter_sceneview_fibre = scene_fibre_collection.NewIterator()
 
-        for m in range(nmodel):
-          modeli = iter_model.GetCurrentObject()
-          print 'Add model ', modeli.GetName(), 'to ', viewNode.GetName()
-          displayNode = modeli.GetDisplayNode()
-          displayNode.RemoveAllViewNodeIDs()
-          print modeli.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
-          modeli.AddAndObserveDisplayNodeID(displayNode.GetID()) 
-          displayNode.AddViewNodeID(viewNode.GetID())
-          displayNode.SetVisibility(True)
-          iter_model.GoToNextItem()
-          print 'After Adding ID, ',modeli.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
-          modeli.AddAndObserveDisplayNodeID(displayNode.GetID()) 
+        modelMap = {}
+        fibreMap = {}
 
-        for f in range(nfiber):
-          fiberi = iter_fiber.GetCurrentObject()
-          print 'Add fiber ', fiberi.GetName(), 'to ', viewNode.GetName()
-          displayNode = fiberi.GetDisplayNode()
+        # save scene view models and fibres to dictionary of <ID,node>
+        for m in range(n_sceneview_model):
+          modeli = iter_sceneview_model.GetCurrentObject()
+          iter_sceneview_model.GoToNextItem()
+          # remove this model from all renders          
+          modeli.GetDisplayNode().RemoveAllViewNodeIDs()
+
+          # add this model to scene if it is not in it
+          if scene.GetNodeByID(modeli.GetID()) == None:
+            print 'add ', modeli.GetName(), 'to the scene'
+            scene.AddNode(modeli)
+
+          modelMap[modeli.GetID()] = modeli
+
+        for f in range(n_sceneview_fibre):
+          fibrei = iter_sceneview_fibre.GetCurrentObject()
+          iter_sceneview_fibre.GoToNextItem()
+          # remove this fibre from all renders          
+          fibrei.GetDisplayNode().RemoveAllViewNodeIDs()
+          fibreMap[fibrei.GetID()] = fibrei
+
+        slicer.mrmlScene.StartState(0x0008 | 0x0001)
+
+        for m in range(n_scene_model):
+          modeli = iter_scene_model.GetCurrentObject()
+
+          # see if this node is in the current sceneview
+          if modeli.GetID() in modelMap:
+            displayNode = modeli.GetDisplayNode()
+            #slicer.mrmlScene.AddNode(displayNode)
+            #displayNode.RemoveAllViewNodeIDs()
+            modeli.AddAndObserveDisplayNodeID(displayNode.GetID()) 
+            displayNode.AddViewNodeID(viewNode.GetID())
+            displayNode.SetVisibility(False)
+            modeli.SetDisplayVisibility(0)
+
+            print 'Add model ', modeli.GetName(), 'to ', viewNode.GetName()
+            print modeli.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
+
+          else:
+            print modeli.GetName(), 'not in the scene!!!!!!!'
+
+          modeli.UpdateScene(scene)
+
+          iter_scene_model.GoToNextItem()
+
+        slicer.mrmlScene.EndState(0x0008 | 0x0001)
+
+
+        '''
+        for f in range(nfibre):
+          fibrei = iter_fibre.GetCurrentObject()
+          print 'Add fibre ', fibrei.GetName(), 'to ', viewNode.GetName()
+          displayNode = fibrei.GetDisplayNode()
           displayNode.RemoveAllViewNodeIDs()
-          fiberi.AddAndObserveDisplayNodeID(displayNode.GetID()) 
+          fibrei.AddAndObserveDisplayNodeID(displayNode.GetID()) 
           displayNode.AddViewNodeID(viewNode.GetID())
-          displayNode.SetVisibility(True)
-          print 'After Adding ID',fiberi.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
-          iter_fiber.GoToNextItem()
+          displayNode.SetVisibility(False)
+          print 'After Adding ID',fibrei.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
+          iter_fibre.GoToNextItem()
+        '''
+
     
 class MosaicViewerTest(unittest.TestCase):
   """

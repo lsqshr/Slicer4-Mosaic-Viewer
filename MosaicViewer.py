@@ -16,7 +16,7 @@ class MosaicViewer:
     This module creates mosaic views of multiple volumes and models
     """
     parent.acknowledgementText = """
-    This file was developed by Siqi Liu, University of Sydney, Sidong Liu, University of Sydney and Brigham and Women's
+    This f was developed by Siqi Liu, University of Sydney, Sidong Liu, University of Sydney and Brigham and Women's
     Hospital and Sonia Pujol, Brigham and Women's Hospital, and was partially supported by ARC, AADRF, NIH NA-MIC
     (U54EB005149) and NIH NAC (P41EB015902).
     """ 
@@ -105,7 +105,7 @@ class MosaicViewerWidget:
     # reload and test button
     # (use this during development, but remove it when delivering your module to users)
     # reload and run specific tests
-    scenarios = ('All', 'Model', 'Volume', 'Scene', 'Selected')
+    scenarios = ('All', 'Model', 'Volume', 'SceneView', 'Selected')
     for scenario in scenarios:
       button = qt.QPushButton("Reload and Test %s" % scenario)
       button.toolTip = "Reload this module and then run the self test on %s." % scenario
@@ -205,15 +205,15 @@ class MosaicViewerWidget:
     widgetName = moduleName + "Widget"
 
     # reload the source code
-    # - set source file path
+    # - set source f path
     # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
+    fPath = eval('slicer.modules.%s.path' % moduleName.lower())
+    p = os.path.dirname(fPath)
     if not sys.path.__contains__(p):
       sys.path.insert(0,p)
-    fp = open(filePath, "r")
+    fp = open(fPath, "r")
     globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
+        moduleName, fp, fPath, ('.py', 'r', imp.PY_SOURCE))
     fp.close()
 
     # rebuild the widget
@@ -282,6 +282,10 @@ class MosaicViewerLogic:
     self.colors = slicer.util.getNode('GenericColors')
     self.lookupTable = self.colors.GetLookupTable()
 
+  def updateNViewNode(self):
+    lviewnode = slicer.util.getNodes("*ViewNode*")
+    self.nViewNode =  len(lviewnode.keys())
+
   def assignLayoutDescription(self,layoutDescription):
     """assign the xml to the user-defined layout slot"""
     layoutNode = slicer.util.getNode('*LayoutNode*')
@@ -292,6 +296,8 @@ class MosaicViewerLogic:
     layoutNode.SetViewArrangement(layoutNode.SlicerLayoutUserView)
 
   def makeLayout(self, nodes, viewNames):
+    self.updateNViewNode()
+
     import math
     # make an default display layout array, e.g.:
     # nvolumes = 3 -> 2 x 2 (nrows = ncolumes, with only one volume in second row)
@@ -325,10 +331,6 @@ class MosaicViewerLogic:
       layoutDescription += '</layout></item>\n'
     layoutDescription += '</layout>'
     self.assignLayoutDescription(layoutDescription)
-
-    print '\nrows: ', nRows, '\tcolumns: ', nColumns, '\nNumber of Volumes: ', nNodes, '\nNumber of View Names:', len(actualViewNames), '\n'
-    print actualViewNames
-    print '\n'
 
     return actualViewNames
 
@@ -397,26 +399,152 @@ class MosaicViewerLogic:
 
     return threeDNodesByViewName
 
+  
+  def renderAllNodes(self, pattern="vtkMRMLModelNode*"):
 
-  def renderAllNodes(self, pattern = "vtkMRMLModelNode*"):
     '''
     Search all models which are currently loaded in the mrml scene and 
     render them in the a grid view
     '''
     nodesDict = slicer.util.getNodes(pattern)
     nodes = [n for n in nodesDict.values() if "Slice" not in n.GetName()]
-    nodeType = lambda nt : "Model" if pattern == 'vtkMRMLModelNode*' else "Volume"
-    self.viewerPerNode(nodes = nodes, viewNames = [n.GetName() for n in nodes],\
-       nodeType = nodeType(pattern))
+    nodeType = lambda nt: "Model" if pattern == 'vtkMRMLModelNode*' else "Volume" 
+    self.viewerPerNode(nodes=nodes, viewNames=[n.GetName() for n in nodes], nodeType=nodeType(pattern))
+
+  def _getViewIndex(self, sceneViewIndex, nSceneViewNode):
+    '''
+    get the starting index of view node by filtering rubbish
+    '''
+    lViewNode   = slicer.util.getNodes('vtkMRMLViewNode*');
+    keys2Remove = []
+
+    for key in lViewNode:
+      viewName = lViewNode[key].GetName()
+      if viewName in ["Red", "Yellow", "Green"]:
+        keys2Remove.append(key)
+
+    for key in keys2Remove:
+      lViewNode.pop(key)
+
+    print '#view nodes after removing slices:', lViewNode.keys()
+    return len(lViewNode.keys()) - (nSceneViewNode - sceneViewIndex)
 
   def renderAllSceneViewNodes(self):
-      nodesDict = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
-      nodes = [n for n in nodesDict.values() if "Slice" not in n.GetName()]
-      nodeType = "SceneView"
-      viewNames = [n.GetName() for n in nodes]
-      nodes.sort()
-      viewNames.sort()
-      self.viewerPerNode(nodes = nodes, viewNames = viewNames, nodeType = nodeType)
+
+      print '=================================='
+      scene = slicer.mrmlScene
+
+      # Find loaded sceneviews
+      nodes_dict = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
+      sv_nodes   = [n for n in nodes_dict.values() if "Slice" not in n.GetName()]
+
+      # Make the layout according to the # scene view nodes
+      self.makeLayout(sv_nodes, [n.GetName() for n in sv_nodes])
+      layoutManager = slicer.app.layoutManager()
+
+      # Get all the model nodes in the scene
+      if len(sv_nodes) == 0 :
+        return 
+
+      # iterate all scene view nodes
+      for s in range(len(sv_nodes)):
+        sceneview = sv_nodes[s]
+
+        # get the models and fibre bundles from sceneview
+        sceneview_model_collection = sv_nodes[s].GetNodesByClass('vtkMRMLModelNode')
+        sceneview_fibre_collection = sv_nodes[s].GetNodesByClass('vtkMRMLfibreBundleNode')
+        n_sceneview_model          = sceneview_model_collection.GetNumberOfItems()
+        n_sceneview_fibre          = sceneview_fibre_collection.GetNumberOfItems()
+        
+        # get the index-th 3D view node
+        # TODO: not sure if the index is right
+        viewIndex                  = self._getViewIndex(s, len(sv_nodes))
+        #print viewIndex
+        threeDWidget               = layoutManager.threeDWidget(viewIndex)
+        threeDView                 = threeDWidget.threeDView() 
+        viewNode                   = threeDView.mrmlViewNode()
+        
+        # initialize the model and fibre iterators
+        iter_sceneview_model       = sceneview_model_collection.NewIterator()
+        iter_sceneview_fibre       = sceneview_fibre_collection.NewIterator()
+        
+        modelMap         = {}
+        fibreMap         = {}
+
+        # DEBUG
+        print '\n', sceneview.GetName(), ':', viewNode.GetName() 
+
+        # save scene view models and fibres to dictionary of <ID,node>
+        for m in range(n_sceneview_model):
+          modeli = iter_sceneview_model.GetCurrentObject()
+          iter_sceneview_model.GoToNextItem()
+          # remove this model from all renders          
+          modeli.GetDisplayNode().RemoveAllViewNodeIDs()
+
+          # add this model to scene if it is not in it
+          if scene.GetNodeByID(modeli.GetID()) == None:
+            print 'add ', modeli.GetName(), 'to the scene'
+            slicer.mrmlScene.AddNode(modeli)
+            #modeli.UpdateScene(scene)
+
+          modelMap[modeli.GetID()] = modeli
+
+        # get all model and fibre nodes from scene
+        scene_model_collection = scene.GetNodesByClass('vtkMRMLModelNode')
+        scene_fibre_collection = scene.GetNodesByClass('vtkMRMLfibreBundleNode')
+        n_scene_model          = scene_model_collection.GetNumberOfItems()
+        n_scene_fibre          = scene_fibre_collection.GetNumberOfItems()
+        iter_scene_model           = scene_model_collection.NewIterator()
+        iter_scene_fibre           = scene_fibre_collection.NewIterator()
+
+        for f in range(n_sceneview_fibre):
+          fibrei = iter_sceneview_fibre.GetCurrentObject()
+          iter_sceneview_fibre.GoToNextItem()
+          # remove this fibre from all renders          
+          fibrei.GetDisplayNode().RemoveAllViewNodeIDs()
+          fibreMap[fibrei.GetID()] = fibrei
+
+        slicer.mrmlScene.StartState(0x0001)
+
+        for m in range(n_scene_model):
+          modeli = iter_scene_model.GetCurrentObject()
+
+          # see if this node is in the current sceneview
+          if modeli.GetID() in modelMap:
+            displayNode = modeli.GetDisplayNode()
+            #slicer.mrmlScene.AddNode(displayNode)
+            #displayNode.RemoveAllViewNodeIDs()
+            modeli.AddAndObserveDisplayNodeID(displayNode.GetID()) 
+            displayNode.AddViewNodeID(viewNode.GetID())
+            displayNode.SetVisibility(False)
+            modeli.SetDisplayVisibility(1)
+
+            print 'Add model ', modeli.GetName(), 'to ', viewNode.GetName()
+            #print modeli.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
+
+          else:
+            print modeli.GetName(), 'not in the scene!!!!!!!'
+
+          modeli.UpdateScene(scene)
+
+          iter_scene_model.GoToNextItem()
+
+        slicer.mrmlScene.EndState(0x0001)
+
+
+        '''
+        for f in range(nfibre):
+          fibrei = iter_fibre.GetCurrentObject()
+          print 'Add fibre ', fibrei.GetName(), 'to ', viewNode.GetName()
+          displayNode = fibrei.GetDisplayNode()
+          displayNode.RemoveAllViewNodeIDs()
+          fibrei.AddAndObserveDisplayNodeID(displayNode.GetID()) 
+          displayNode.AddViewNodeID(viewNode.GetID())
+          displayNode.SetVisibility(False)
+          print 'After Adding ID',fibrei.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
+          iter_fibre.GoToNextItem()
+        '''
+
     
 class MosaicViewerTest(unittest.TestCase):
   """
@@ -456,6 +584,8 @@ class MosaicViewerTest(unittest.TestCase):
       self.test_MosaicViewer_Model()
     elif scenario == "Selected":
       self.test_MosaicViewer_Customized()
+    elif scenario == 'SceneView':
+      self.test_MosaicViewer_SceneView()      
     elif scenario == 'All':
       self.test_MosaicViewer_All()
     else:
@@ -477,16 +607,16 @@ class MosaicViewerTest(unittest.TestCase):
 
     self.delayDisplay("Starting the test, loading data")
 
-    filePath = eval('slicer.modules.mosaicviewer.path')
-    fileDirName = os.path.dirname(filePath) + '/Resources/SampleVolumes'
+    fPath = eval('slicer.modules.mosaicviewer.path')
+    fDirName = os.path.dirname(fPath) + '/Resources/SampleVolumes'
 
-    for file in os.listdir(fileDirName):
-        if file.endswith(".nrrd"):
-            slicer.util.loadVolume(fileDirName + '/' + file)
-            fileName, fileExtension = os.path.splitext(file)
-            print "loading " + fileName
-            volumes.append(fileName)
-            volumeNames.append(fileName)
+    for f in os.listdir(fDirName):
+      if f.endswith(".nrrd"):
+          slicer.util.loadVolume(fDirName + '/' + f)
+          fName, fExtension = os.path.splitext(f)
+          print "loading " + fName
+          volumes.append(fName)
+          volumeNames.append(fName)
 
     logic = MosaicViewerLogic()
     logic.viewerPerNode(nodes = volumes, viewNames = volumeNames, nodeType = "Volume")
@@ -500,16 +630,41 @@ class MosaicViewerTest(unittest.TestCase):
 
     self.delayDisplay("Starting the test, loading data")
 
-    filePath = eval('slicer.modules.mosaicviewer.path')
-    fileDirName = os.path.dirname(filePath) + '/Resources/SampleModels'
+    fPath = eval('slicer.modules.mosaicviewer.path')()
+    fDirName = os.path.dirname(fPath) + '/Resources/SimpleSceneViews'
 
-    for file in os.listdir(fileDirName):
-        if file.endswith(".vtk"):
-            slicer.util.loadModel(fileDirName + '/' + file)
-            fileName, fileExtension = os.path.splitext(file)
-            print "loading " + fileName
-            models.append(slicer.util.getNode(fileName))
-            modelNames.append(fileName)
+    for f in os.listdir(fDirName):
+      if f.endswith(".vtk"):
+          slicer.util.loadModel(fDirName + '/' + f)
+          fName, fExtension = os.path.splitext(f)
+          print "loading " + fName
+          models.append(slicer.util.getNode(fName))
+          modelNames.append(fName)
 
     logic = MosaicViewerLogic()
     logic.viewerPerNode(nodes = models, viewNames = modelNames, nodeType = "Model")
+
+  def test_MosaicViewer_SceneView(self):
+    self.setUp()
+
+    m = slicer.util.mainWindow()
+    m.moduleSelector().selectModule('MosaicViewer')
+
+    sceneViews = []
+    svNames = []
+
+    self.delayDisplay("Starting the test, loading data")
+
+    fPath = eval('slicer.modules.mosaicviewer.path')
+    fDirName = os.path.dirname(fPath) + '/Resources/SimpleSceneViews'
+
+    for f in os.listdir(fDirName):
+      if f.endswith(".mrb"):
+        slicer.util.loadScene(fDirName + '/' + f)
+        fName, fExtension = os.path.splitext(f)
+        print "loading " + fName
+        sceneViews.append(slicer.util.getNode(fName))
+        svNames.append(fName)
+
+    logic = MosaicViewerLogic()
+    logic.renderAllSceneViewNodes()

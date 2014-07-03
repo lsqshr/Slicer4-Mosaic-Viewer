@@ -105,7 +105,7 @@ class MosaicViewerWidget:
     # reload and test button
     # (use this during development, but remove it when delivering your module to users)
     # reload and run specific tests
-    scenarios = ('All', 'Model', 'Volume', 'SceneView', 'Selected')
+    scenarios = ('All', 'Model', 'Volume', 'SceneView_Simple', 'SceneView_Complex', 'Selected')
     for scenario in scenarios:
       button = qt.QPushButton("Reload and Test %s" % scenario)
       button.toolTip = "Reload this module and then run the self test on %s." % scenario
@@ -430,11 +430,10 @@ class MosaicViewerLogic:
       self.makeLayout(sv_nodes, [n.GetName() for n in sv_nodes])
       layoutManager = slicer.app.layoutManager()
 
-      # Get all the model nodes in the scene
       if len(sv_nodes) == 0 :
         return 
 
-      # iterate all scene view nodes
+      # iterate all loaded scene view nodes
       for s in range(len(sv_nodes)):
         sceneview = sv_nodes[s]
 
@@ -445,9 +444,6 @@ class MosaicViewerLogic:
         n_sceneview_fibre          = sceneview_fibre_collection.GetNumberOfItems()
         
         # get the index-th 3D view node
-        # TODO: not sure if the index is right
-
-        #print viewIndex
         threeDWidget               = layoutManager.threeDWidget(s)
         threeDView                 = threeDWidget.threeDView() 
         viewNode                   = threeDView.mrmlViewNode()
@@ -519,7 +515,6 @@ class MosaicViewerLogic:
 
         slicer.mrmlScene.EndState(0x0001)
 
-
         '''
         for f in range(nfibre):
           fibrei = iter_fibre.GetCurrentObject()
@@ -572,8 +567,10 @@ class MosaicViewerTest(unittest.TestCase):
       self.test_MosaicViewer_Model()
     elif scenario == "Selected":
       self.test_MosaicViewer_Customized()
-    elif scenario == 'SceneView':
-      self.test_MosaicViewer_SceneView()      
+    elif scenario == 'SceneView_Simple':
+      self.test_MosaicViewer_SceneView('SeneView_Simple')      
+    elif scenario == 'SceneView_Complex':
+      self.test_MosaicViewer_SceneView('SeneView_Complex')      
     elif scenario == 'All':
       self.test_MosaicViewer_All()
     else:
@@ -596,11 +593,11 @@ class MosaicViewerTest(unittest.TestCase):
     self.delayDisplay("Starting the test, loading data")
 
     fPath = eval('slicer.modules.mosaicviewer.path')
-    fDirName = os.path.dirname(fPath) + '/Resources/SampleVolumes'
+    fDir = os.path.dirname(fPath) + '/Resources/SampleVolumes'
 
-    for f in os.listdir(fDirName):
+    for f in os.listdir(fDir):
       if f.endswith(".nrrd"):
-          slicer.util.loadVolume(fDirName + '/' + f)
+          slicer.util.loadVolume(fDir + '/' + f)
           fName, fExtension = os.path.splitext(f)
           print "loading " + fName
           volumes.append(fName)
@@ -619,11 +616,11 @@ class MosaicViewerTest(unittest.TestCase):
     self.delayDisplay("Starting the test, loading data")
 
     fPath = eval('slicer.modules.mosaicviewer.path')()
-    fDirName = os.path.dirname(fPath) + '/Resources/SimpleSceneViews'
+    fDir = os.path.dirname(fPath) + '/Resources/SimpleSceneViews'
 
-    for f in os.listdir(fDirName):
+    for f in os.listdir(fDir):
       if f.endswith(".vtk"):
-          slicer.util.loadModel(fDirName + '/' + f)
+          slicer.util.loadModel(fDir + '/' + f)
           fName, fExtension = os.path.splitext(f)
           print "loading " + fName
           models.append(slicer.util.getNode(fName))
@@ -632,7 +629,7 @@ class MosaicViewerTest(unittest.TestCase):
     logic = MosaicViewerLogic()
     logic.viewerPerNode(nodes = models, viewNames = modelNames, nodeType = "Model")
 
-  def test_MosaicViewer_SceneView(self):
+  def test_MosaicViewer_SceneView(self, sub_scenario):
     self.setUp()
 
     m = slicer.util.mainWindow()
@@ -644,11 +641,14 @@ class MosaicViewerTest(unittest.TestCase):
     self.delayDisplay("Starting the test, loading data")
 
     fPath = eval('slicer.modules.mosaicviewer.path')
-    fDirName = os.path.dirname(fPath) + '/Resources/SimpleSceneViews'
+    if sub_scenario == 'SeneView_Simple':
+      fDir = os.path.dirname(fPath) + '/Resources/SimpleSceneViews'
+    elif sub_scenario == 'SeneView_Complex':
+      fDir = os.path.dirname(fPath) + '/Resources/ComplexSceneViews'
 
-    for f in os.listdir(fDirName):
+    for f in os.listdir(fDir):
       if f.endswith(".mrb"):
-        slicer.util.loadScene(fDirName + '/' + f)
+        slicer.util.loadScene(fDir + '/' + f)
         fName, fExtension = os.path.splitext(f)
         print "loading " + fName
         sceneViews.append(slicer.util.getNode(fName))

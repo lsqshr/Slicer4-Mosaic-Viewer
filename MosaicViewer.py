@@ -296,7 +296,13 @@ class MosaicViewerLogic:
     layoutNode.SetViewArrangement(layoutNode.SlicerLayoutUserView)
 
   def makeLayout(self, nodes, viewNames):
-    self.updateNViewNode()
+    # remove all previous view nodes
+    lViewNode = slicer.util.getNodes('*LViewNode*')
+    scene = slicer.mrmlScene
+
+    for key in lViewNode:
+      print 'Removing view:', lViewNode[key].GetName()
+      scene.RemoveNode(lViewNode[key])
 
     import math
     # make an default display layout array, e.g.:
@@ -411,24 +417,6 @@ class MosaicViewerLogic:
     nodeType = lambda nt: "Model" if pattern == 'vtkMRMLModelNode*' else "Volume" 
     self.viewerPerNode(nodes=nodes, viewNames=[n.GetName() for n in nodes], nodeType=nodeType(pattern))
 
-  def _getViewIndex(self, sceneViewIndex, nSceneViewNode):
-    '''
-    get the starting index of view node by filtering rubbish
-    '''
-    lViewNode   = slicer.util.getNodes('vtkMRMLViewNode*');
-    keys2Remove = []
-
-    for key in lViewNode:
-      viewName = lViewNode[key].GetName()
-      if viewName in ["Red", "Yellow", "Green"]:
-        keys2Remove.append(key)
-
-    for key in keys2Remove:
-      lViewNode.pop(key)
-
-    print '#view nodes after removing slices:', lViewNode.keys()
-    return len(lViewNode.keys()) - (nSceneViewNode - sceneViewIndex)
-
   def renderAllSceneViewNodes(self):
 
       print '=================================='
@@ -458,9 +446,9 @@ class MosaicViewerLogic:
         
         # get the index-th 3D view node
         # TODO: not sure if the index is right
-        viewIndex                  = self._getViewIndex(s, len(sv_nodes))
+
         #print viewIndex
-        threeDWidget               = layoutManager.threeDWidget(viewIndex)
+        threeDWidget               = layoutManager.threeDWidget(s)
         threeDView                 = threeDWidget.threeDView() 
         viewNode                   = threeDView.mrmlViewNode()
         
@@ -656,7 +644,7 @@ class MosaicViewerTest(unittest.TestCase):
     self.delayDisplay("Starting the test, loading data")
 
     fPath = eval('slicer.modules.mosaicviewer.path')
-    fDirName = os.path.dirname(fPath) + '/Resources/SoniaSceneViews'
+    fDirName = os.path.dirname(fPath) + '/Resources/SimpleSceneViews'
 
     for f in os.listdir(fDirName):
       if f.endswith(".mrb"):

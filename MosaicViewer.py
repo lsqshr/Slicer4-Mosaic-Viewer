@@ -338,6 +338,11 @@ class MosaicViewerLogic:
     layoutDescription += '</layout>'
     self.assignLayoutDescription(layoutDescription)
 
+    viewnodes = slicer.util.getNodes('*LViewNode*')
+    if 'View1' in viewnodes:
+      print 'View1 still there! Removing it.'
+      slicer.mrmlScene.RemoveNode(viewnodes['View1'])
+
     return actualViewNames
 
 
@@ -443,7 +448,7 @@ class MosaicViewerLogic:
         n_sceneview_model          = sceneview_model_collection.GetNumberOfItems()
         n_sceneview_fibre          = sceneview_fibre_collection.GetNumberOfItems()
         
-        # get the index-th 3D view node
+        # get the s-th 3D view node
         threeDWidget               = layoutManager.threeDWidget(s)
         threeDView                 = threeDWidget.threeDView() 
         viewNode                   = threeDView.mrmlViewNode()

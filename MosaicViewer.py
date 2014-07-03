@@ -656,7 +656,7 @@ class MosaicViewerTest(unittest.TestCase):
     self.delayDisplay("Starting the test, loading data")
 
     fPath = eval('slicer.modules.mosaicviewer.path')
-    fDirName = os.path.dirname(fPath) + '/Resources/SimpleSceneViews'
+    fDirName = os.path.dirname(fPath) + '/Resources/SoniaSceneViews'
 
     for f in os.listdir(fDirName):
       if f.endswith(".mrb"):

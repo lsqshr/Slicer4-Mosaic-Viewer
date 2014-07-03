@@ -112,7 +112,6 @@ class MosaicViewerWidget:
       reloadFormLayout.addWidget(button)
       button.connect('clicked()', lambda s = scenario: self.onReloadAndTest(scenario = s))
 
-    '''
     #
     # Input Data Selection Area
     #
@@ -162,7 +161,7 @@ class MosaicViewerWidget:
     changeLayoutFrame.layout().addWidget(chooseRowFrame)
     chooseColumnFrame, chooseColumnSlider, chooseColumnSliderSpinBox = numericInputFrame(self.parent, "Number of Columns:", "Choose Number of Columns", 0, 20, 1, 1)
     changeLayoutFrame.layout().addWidget(chooseColumnFrame)
-    '''
+
 
     # TODO: add two radials, one for default and one for customized layout. If 'customized' is selected, generate a grid to enable the users to customize the viewer layout.
     # chooseCustomizedTable = qt.QTableWidget(5, 5)
@@ -402,6 +401,7 @@ class MosaicViewerLogic:
 
   
   def renderAllNodes(self, pattern="vtkMRMLModelNode*"):
+
     '''
     Search all models which are currently loaded in the mrml scene and 
     render them in the a grid view
@@ -429,8 +429,8 @@ class MosaicViewerLogic:
     print '#view nodes after removing slices:', lViewNode.keys()
     return len(lViewNode.keys()) - (nSceneViewNode - sceneViewIndex)
 
-
   def renderAllSceneViewNodes(self):
+
       print '=================================='
       scene = slicer.mrmlScene
 

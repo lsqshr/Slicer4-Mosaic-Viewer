@@ -8,11 +8,11 @@ from __main__ import vtk, qt, ctk, slicer
 
 class MosaicViewer:
   def __init__(self, parent):
-    parent.title = "Mosaic Viewer"
-    parent.categories = ["Wizards"]
+    parent.title        = "Mosaic Viewer"
+    parent.categories   = ["Wizards"]
     parent.dependencies = []
     parent.contributors = ["Sidong Liu (USYD, BWH), Siqi Liu (USYD), Sonia Pujol (BWH)"]
-    parent.helpText = """
+    parent.helpText     = """
     This module creates mosaic views of multiple volumes and models
     """
     parent.acknowledgementText = """
@@ -36,34 +36,42 @@ class MosaicViewer:
     tester = MosaicViewerTest()
     tester.runTest()
 
+#=====================================================
+#
+# Numeric parameter input
+#
 def numericInputFrame(parent, label, tooltip, minimum, maximum, step, decimals):
-  inputFrame = qt.QFrame(parent)
+  inputFrame              = qt.QFrame(parent)
   inputFrame.setLayout(qt.QHBoxLayout())
-  inputLabel = qt.QLabel(label, inputFrame)
+  inputLabel              = qt.QLabel(label, inputFrame)
   inputLabel.setToolTip(tooltip)
   inputFrame.layout().addWidget(inputLabel)
-  inputSpinBox = qt.QDoubleSpinBox(inputFrame)
+  inputSpinBox            = qt.QDoubleSpinBox(inputFrame)
   inputSpinBox.setToolTip(tooltip)
-  inputSpinBox.minimum = minimum
-  inputSpinBox.maximum = maximum
+  inputSpinBox.minimum    = minimum
+  inputSpinBox.maximum    = maximum
   inputSpinBox.singleStep = step
-  inputSpinBox.decimals = decimals
+  inputSpinBox.decimals   = decimals
   inputFrame.layout().addWidget(inputSpinBox)
-  inputSlider = ctk.ctkDoubleSlider(inputFrame)
-  inputSlider.minimum = minimum
-  inputSlider.maximum = maximum
+  inputSlider             = ctk.ctkDoubleSlider(inputFrame)
+  inputSlider.minimum     = minimum
+  inputSlider.maximum     = maximum
   inputSlider.orientation = 1
-  inputSlider.singleStep = step
+  inputSlider.singleStep  = step
   inputSlider.setToolTip(tooltip)
   inputFrame.layout().addWidget(inputSlider)
   return inputFrame, inputSlider, inputSpinBox
 
+
+#=======================================================
 #
 # MosaicViewerWidget
 #
 
 class MosaicViewerWidget:
+  # ---------------------------
   def __init__(self, parent = None):
+    self.developerMode = True # change this to 'True' to get reload and test
     if not parent:
       self.parent = slicer.qMRMLWidget()
       self.parent.setLayout(qt.QVBoxLayout())
@@ -75,102 +83,129 @@ class MosaicViewerWidget:
       self.setup()
       self.parent.show()
     self.layerReveal = None
-
+# -------------------------------------------
   def setup(self):
+    if self.developerMode:
+      #
+      # Reload and Test area
+      #
+      reloadCollapsibleButton       = ctk.ctkCollapsibleButton()
+      reloadCollapsibleButton.text  = "Reload && Test"
+      self.layout.addWidget(reloadCollapsibleButton)
+      reloadFormLayout              = qt.QFormLayout(reloadCollapsibleButton)
 
-    # Instantiate and connect widgets ...
-    #
-    # Reload and Test area
-    #
-    reloadCollapsibleButton = ctk.ctkCollapsibleButton()
-    reloadCollapsibleButton.text = "Reload && Test"
-    self.layout.addWidget(reloadCollapsibleButton)
-    reloadFormLayout = qt.QFormLayout(reloadCollapsibleButton)
+      self.clearButton              = qt.QPushButton("Clear Scene")
+      self.clearButton.toolTip      = "Clear all the volumes and models in 3D views"
+      self.clearButton.name         = "MosaicViewer Clear"
+      reloadFormLayout.addWidget(self.clearButton)
+      self.clearButton.connect('clicked()', self.onClear)
 
-    self.clearButton = qt.QPushButton("Clear Scene")
-    self.clearButton.toolTip = "Clear all the volumes and models in 3D views"
-    self.clearButton.name = "MosaicViewer Clear"
-    reloadFormLayout.addWidget(self.clearButton)
-    self.clearButton.connect('clicked()', self.onClear)
+      # reload button
+      # (use this during development, but remove it when delivering
+      #  your module to users)
+      self.reloadButton             = qt.QPushButton("Reload")
+      self.reloadButton.toolTip     = "Reload this Mosaic Viewer"
+      self.reloadButton.name        = "MosaicViewer Reload"
+      reloadFormLayout.addWidget(self.reloadButton)
+      self.reloadButton.connect('clicked()', self.onReload)
 
-    # reload button
-    # (use this during development, but remove it when delivering
-    #  your module to users)
-    self.reloadButton = qt.QPushButton("Reload")
-    self.reloadButton.toolTip = "Reload this Mosaic Viewer"
-    self.reloadButton.name = "MosaicViewer Reload"
-    reloadFormLayout.addWidget(self.reloadButton)
-    self.reloadButton.connect('clicked()', self.onReload)
+      # reload and test button
+      # (use this during development, but remove it when delivering your module to users)
+      # reload and run specific tests
+      scenarios                     = ('All', 'Model', 'Volume', 'SceneView', 'Selected')
+      for scenario in scenarios:
+        button                      = qt.QPushButton("Reload and Test %s" % scenario)
+        button.toolTip              = "Reload this module and then run the self test on %s." % scenario
+        reloadFormLayout.addWidget(button)
+        button.connect('clicked()', lambda s = scenario: self.onReloadAndTest(scenario = s))
 
-    # reload and test button
-    # (use this during development, but remove it when delivering your module to users)
-    # reload and run specific tests
-    scenarios = ('All', 'Model', 'Volume', 'SceneView', 'Selected')
-    for scenario in scenarios:
-      button = qt.QPushButton("Reload and Test %s" % scenario)
-      button.toolTip = "Reload this module and then run the self test on %s." % scenario
-      reloadFormLayout.addWidget(button)
-      button.connect('clicked()', lambda s = scenario: self.onReloadAndTest(scenario = s))
-
-    #
+    """
     # Input Data Selection Area
     #
-    dataSelectionCollapsibleButtion = ctk.ctkCollapsibleButton()
-    dataSelectionCollapsibleButtion.text = "Select the Volumes && Models"
+    dataSelectionCollapsibleButtion       = ctk.ctkCollapsibleButton()
+    dataSelectionCollapsibleButtion.text  = "Select the Volumes && Models"
     self.layout.addWidget(dataSelectionCollapsibleButtion)
-    dataSelectionFormLayout = qt.QFormLayout(dataSelectionCollapsibleButtion)
+    dataSelectionFormLayout               = qt.QFormLayout(dataSelectionCollapsibleButtion)
 
-    dataSelectionFrame = qt.QFrame(self.parent)
+    dataSelectionFrame                    = qt.QFrame(self.parent)
     dataSelectionFrame.setLayout(qt.QGridLayout())
     dataSelectionFormLayout.addWidget(dataSelectionFrame)
 
-    selectAll = qt.QRadioButton("Select All")
+    selectAll                             = qt.QRadioButton("Select All")
     dataSelectionFrame.layout().addWidget(selectAll, 0, 0)
 
-    selectAllVolumes = qt.QRadioButton("Select All Volumes")
+    selectAllVolumes                      = qt.QRadioButton("Select All Volumes")
     dataSelectionFrame.layout().addWidget(selectAllVolumes, 1, 0)
 
-    selectAllModels = qt.QRadioButton("Select All Models")
+    selectAllModels                       = qt.QRadioButton("Select All Models")
     dataSelectionFrame.layout().addWidget(selectAllModels, 0, 1)
 
-    selectCustomized = qt.QRadioButton("Select From Drop List")
+    selectCustomized                      = qt.QRadioButton("Select From Drop List")
     dataSelectionFrame.layout().addWidget(selectCustomized, 1, 1)
 
     # TODO: add a data check list, enable to select the data from the list.
     # Top three options should be 'Select All', 'Select All Volumes', 'Select All Models'
 
+    """    
     #
     # Layout Option Area
     #
-    changeLayoutOptionCollapsibleButtion = ctk.ctkCollapsibleButton()
+    changeLayoutOptionCollapsibleButtion      = ctk.ctkCollapsibleButton()
     changeLayoutOptionCollapsibleButtion.text = "Choose the Layout"
     self.layout.addWidget(changeLayoutOptionCollapsibleButtion)
-    changeLayoutFormLayout = qt.QFormLayout(changeLayoutOptionCollapsibleButtion)
+    changeLayoutFormLayout                    = qt.QFormLayout(changeLayoutOptionCollapsibleButtion)
 
-    changeLayoutFrame = qt.QFrame(self.parent)
-    changeLayoutFrame.setLayout(qt.QGridLayout())
+    changeLayoutFrame                         = qt.QFrame(self.parent)
+    changeLayoutFrame.setLayout(qt.QVBoxLayout())
     changeLayoutFormLayout.addWidget(changeLayoutFrame)
 
-    chooseDefault = qt.QRadioButton("Choose Default Viewer Layout")
-    changeLayoutFrame.layout().addWidget(chooseDefault, 0, 0)
+    chooseDefault                             = qt.QRadioButton("Default Layout")
+    changeLayoutFrame.layout().addWidget(chooseDefault)
 
-    chooseCustomized = qt.QRadioButton("Choose Customized Layout")
-    changeLayoutFrame.layout().addWidget(chooseCustomized, 0, 1)
+    chooseCustomized                          = qt.QRadioButton("Customized Layout")
+    changeLayoutFrame.layout().addWidget(chooseCustomized)
 
-    chooseRowFrame, chooseRowSlider, chooseRowSliderSpinBox = numericInputFrame(self.parent, "Number of Rows:", "Choose Number of Rows", 0, 20, 1, 1)
+    chooseRowFrame, chooseRowSlider, chooseRowSliderSpinBox = numericInputFrame(self.parent, "Number of Rows:     ", "Choose Number of Rows", 0, 20, 1, 0)
     changeLayoutFrame.layout().addWidget(chooseRowFrame)
-    chooseColumnFrame, chooseColumnSlider, chooseColumnSliderSpinBox = numericInputFrame(self.parent, "Number of Columns:", "Choose Number of Columns", 0, 20, 1, 1)
+
+    chooseColumnFrame, chooseColumnSlider, chooseColumnSliderSpinBox = numericInputFrame(self.parent, "Number of Columns:", "Choose Number of Columns", 0, 20, 1, 0)
     changeLayoutFrame.layout().addWidget(chooseColumnFrame)
 
+    class state(object):
+      layoutMethod  = 'Default'
+      nRows         = 1
+      nColumns      = 1
 
-    # TODO: add two radials, one for default and one for customized layout. If 'customized' is selected, generate a grid to enable the users to customize the viewer layout.
-    # chooseCustomizedTable = qt.QTableWidget(5, 5)
-    # changeLayoutFormLayout.addWidget(chooseCustomizedTable)
+    scope_locals    = locals()
+    def connect(obj, evt, cmd):
+      def callback(*args):
+        current_locals = scope_locals.copy()
+        current_locals.update({'args':args})
+        exec cmd in globals(), current_locals
+        updateGUI()
+      obj.connect(evt, callback)
+
+    def updateGUI():
+      chooseRowFrame.visible          = state.layoutMethod == "Customized"
+      chooseColumnFrame.visible       = state.layoutMethod == "Customized"
+      chooseRowSlider.value           = state.nRows
+      chooseRowSliderSpinBox.value    = state.nRows
+      chooseColumnSlider.value        = state.nColumns
+      chooseColumnSliderSpinBox.value = state.nColumns
+
+    connect(chooseDefault, 'clicked(bool)', 'state.layoutMethod = "Default"')
+    connect(chooseCustomized, 'clicked(bool)', 'state.layoutMethod = "Customized"')    
+    connect(chooseRowSlider, 'valueChanged(double)', 'state.nRows = args[0]')
+    connect(chooseRowSliderSpinBox, 'valueChanged(double)', 'state.nRows = args[0]')
+    connect(chooseColumnSlider, 'valueChanged(double)', 'state.nColumns = args[0]')
+    connect(chooseColumnSliderSpinBox, 'valueChanged(double)', 'state.nColumns = args[0]')
+
+    updateGUI()
+    self.updateGUI  = updateGUI
 
     #
     # Execution Area
     #
-
     # Add vertical spacer
     self.layout.addStretch(1)
 
@@ -186,15 +221,16 @@ class MosaicViewerWidget:
     self.applyButton = qt.QPushButton("Apply")
     self.applyButton.toolTip = "Apply Mosaic Viewer"
     buttonFrame.layout().addWidget(self.applyButton)
-    self.applyButton.connect('clicked()', self.onApply)
+    self.applyButton.connect('clicked()', self.onApply())
 
-  #
-  # Define the attributes
-  #
-
-  def onClear(self):
+  # ----------------------------------- 
+  def onRestoreDefaults():
     slicer.mrmlScene.Clear(0)
 
+  # -------------------------------------
+  def onClear(self):
+    slicer.mrmlScene.Clear(0)
+  # ----------------------------------------------
   def onReload(self, moduleName = "MosaicViewer"):
     """
     Generic reload method for any scripted module.
@@ -236,7 +272,7 @@ class MosaicViewerWidget:
         'globals()["%s"].%s(parent)' % (moduleName, widgetName))
     globals()[widgetName.lower()].setup()
 
-
+  # ---------------------------------------------
   def onReloadAndTest(self, moduleName = "MosaicViewer", scenario = None):
     try:
       self.onReload(moduleName)
@@ -249,29 +285,26 @@ class MosaicViewerWidget:
       qt.QMessageBox.warning(slicer.util.mainWindow(),
           "Reload and Test", 'Exception!\n\n' + str(e) + "\n\nSee Python Console for Stack Trace")
 
-
+  # ------------------------------------------
   def onRenderAllNodes(self, pattern):
     logic = MosaicViewerLogic()
     logic.renderAllNodes(pattern)
 
+  # -----------------------------------
   def onRestore(self):
-      self.onReload("MosaicViewer")
+    self.onReload("MosaicViewer")
 
+  # ------------------------------------
   def onApply(self):
-      logic = MosaicViewerLogic()
-      logic.renderAllSceneViewNodes()
+    logic = MosaicViewerLogic()
+    logic.renderAllSceneViewNodes()
 
+# ============================================================
 #
 # MosaicViewerLogic
 #
-
 class MosaicViewerLogic:
-  """This class should implement all the actual
-  computation done by your module.  The interface
-  should be such that other python code can import
-  this class and make use of the functionality without
-  requiring an instance of the Widget
-  """
+  # -------------------------------
   def __init__(self):
     self.threeDViewPattern = """
       <item><view class="vtkMRMLViewNode" singletontag="{viewName}">
@@ -281,11 +314,13 @@ class MosaicViewerLogic:
     # use a nice set of colors
     self.colors = slicer.util.getNode('GenericColors')
     self.lookupTable = self.colors.GetLookupTable()
-
+  
+  # ----------------------------------  
   def updateNViewNode(self):
     lviewnode = slicer.util.getNodes("*ViewNode*")
     self.nViewNode =  len(lviewnode.keys())
 
+  # ----------------------------------
   def assignLayoutDescription(self,layoutDescription):
     """assign the xml to the user-defined layout slot"""
     layoutNode = slicer.util.getNode('*LayoutNode*')
@@ -295,7 +330,8 @@ class MosaicViewerLogic:
       layoutNode.AddLayoutDescription(layoutNode.SlicerLayoutUserView, layoutDescription)
     layoutNode.SetViewArrangement(layoutNode.SlicerLayoutUserView)
 
-  def makeLayout(self, nodes, viewNames):
+  # ------------------------------------
+  def makeLayout(self, nodes, viewNames, nRows = 1, nColumns = 1):
     self.updateNViewNode()
 
     import math
@@ -304,11 +340,13 @@ class MosaicViewerLogic:
     # nvolumes = 5 -> 2 x 3 (nrows < ncolumes, with only two volumes in second row)
     # nvoluems = 11 -> 3 x 4 (nrows < ncolums, with only three volumes in the third row)
     nNodes = len(nodes)
-    qNNodes = math.sqrt(nNodes)
-    nRows = math.floor(qNNodes)
-    nColumns = math.ceil(qNNodes)
-    if nNodes > nRows * nColumns:
-        nRows = nRows + 1;
+    
+    if nNodes > nRows * nColumns or nRows is None or nColumns is None:
+      qNNodes = math.sqrt(nNodes)
+      nRows = math.floor(qNNodes)
+      nColumns = math.ceil(qNNodes)
+      if nNodes > nRows * nColumns:
+          nRows = nRows + 1;
 
     # construct the XML for the layout
     # - one viewer per volume
@@ -325,6 +363,7 @@ class MosaicViewerLogic:
           viewName = viewNames[index - 1]
         except IndexError:
           viewName = '%d-%d' % (row,column)
+          # viewName = 'null'
         layoutDescription += self.threeDViewPattern.format(viewName = viewName)
         actualViewNames.append(viewName)
         index += 1
@@ -334,7 +373,7 @@ class MosaicViewerLogic:
 
     return actualViewNames
 
-
+  # -------------------------------------------
   def viewerPerNode(self, nodes = None, viewNames = [], nodeType = ""):
     """ Load each volume in the scene into its own
     3D viewer and link them all together.
@@ -399,7 +438,8 @@ class MosaicViewerLogic:
 
     return threeDNodesByViewName
 
-  
+
+  # --------------------------------------
   def renderAllNodes(self, pattern="vtkMRMLModelNode*"):
 
     '''
@@ -411,6 +451,7 @@ class MosaicViewerLogic:
     nodeType = lambda nt: "Model" if pattern == 'vtkMRMLModelNode*' else "Volume" 
     self.viewerPerNode(nodes=nodes, viewNames=[n.GetName() for n in nodes], nodeType=nodeType(pattern))
 
+  # -----------------------------------------
   def _getViewIndex(self, sceneViewIndex, nSceneViewNode):
     '''
     get the starting index of view node by filtering rubbish
@@ -429,17 +470,24 @@ class MosaicViewerLogic:
     print '#view nodes after removing slices:', lViewNode.keys()
     return len(lViewNode.keys()) - (nSceneViewNode - sceneViewIndex)
 
-  def renderAllSceneViewNodes(self):
+  # ------------------------------------------
+  def renderAllSceneViewNodes(self, state = None):
 
       print '=================================='
+      # print 'nRows: ', state.nRows, ';  nColumns: ', state.nColumns
       scene = slicer.mrmlScene
 
       # Find loaded sceneviews
       nodes_dict = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
+
       sv_nodes   = [n for n in nodes_dict.values() if "Slice" not in n.GetName()]
 
       # Make the layout according to the # scene view nodes
-      self.makeLayout(sv_nodes, [n.GetName() for n in sv_nodes])
+      if state is None or state.layoutMethod == 'Default':
+        self.makeLayout(sv_nodes, [n.GetName() for n in sv_nodes])
+      else:
+        self.makeLayout(sv_nodes, [n.GetName() for n in sv_nodes], state.nRows, state.nColumns)
+
       layoutManager = slicer.app.layoutManager()
 
       # Get all the model nodes in the scene
@@ -451,8 +499,8 @@ class MosaicViewerLogic:
         sceneview = sv_nodes[s]
 
         # get the models and fibre bundles from sceneview
-        sceneview_model_collection = sv_nodes[s].GetNodesByClass('vtkMRMLModelNode')
-        sceneview_fibre_collection = sv_nodes[s].GetNodesByClass('vtkMRMLfibreBundleNode')
+        sceneview_model_collection = sceneview.GetNodesByClass('vtkMRMLModelNode')
+        sceneview_fibre_collection = sceneview.GetNodesByClass('vtkMRMLFibreBundleNode')
         n_sceneview_model          = sceneview_model_collection.GetNumberOfItems()
         n_sceneview_fibre          = sceneview_fibre_collection.GetNumberOfItems()
         
@@ -478,8 +526,9 @@ class MosaicViewerLogic:
         for m in range(n_sceneview_model):
           modeli = iter_sceneview_model.GetCurrentObject()
           iter_sceneview_model.GoToNextItem()
-          # remove this model from all renders          
-          modeli.GetDisplayNode().RemoveAllViewNodeIDs()
+          # remove this model from all renders
+          if modeli.GetDisplayNode() is not None:         
+            modeli.GetDisplayNode().RemoveAllViewNodeIDs()
 
           # add this model to scene if it is not in it
           if scene.GetNodeByID(modeli.GetID()) == None:
@@ -491,11 +540,11 @@ class MosaicViewerLogic:
 
         # get all model and fibre nodes from scene
         scene_model_collection = scene.GetNodesByClass('vtkMRMLModelNode')
-        scene_fibre_collection = scene.GetNodesByClass('vtkMRMLfibreBundleNode')
+        scene_fibre_collection = scene.GetNodesByClass('vtkMRMLFibreBundleNode')
         n_scene_model          = scene_model_collection.GetNumberOfItems()
         n_scene_fibre          = scene_fibre_collection.GetNumberOfItems()
-        iter_scene_model           = scene_model_collection.NewIterator()
-        iter_scene_fibre           = scene_fibre_collection.NewIterator()
+        iter_scene_model       = scene_model_collection.NewIterator()
+        iter_scene_fibre       = scene_fibre_collection.NewIterator()
 
         for f in range(n_sceneview_fibre):
           fibrei = iter_sceneview_fibre.GetCurrentObject()
@@ -531,7 +580,6 @@ class MosaicViewerLogic:
 
         slicer.mrmlScene.EndState(0x0001)
 
-
         '''
         for f in range(nfibre):
           fibrei = iter_fibre.GetCurrentObject()
@@ -544,14 +592,19 @@ class MosaicViewerLogic:
           print 'After Adding ID',fibrei.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
           iter_fibre.GoToNextItem()
         '''
+      print '=================================='
 
-    
+# ================================================
+#
+# MosaicViewerTest
+#
 class MosaicViewerTest(unittest.TestCase):
   """
   This is the test case for your scripted module.
   """
-
-  def delayDisplay(self,message,msec=1500):
+  
+  # -------------------------------
+  def delayDisplay(self,message,msec = 1500):
     """This utility method displays a small dialog and waits.
     This does two things: 1) it lets the event loop catch up
     to the state of the test so that rendering and widget updates
@@ -568,17 +621,19 @@ class MosaicViewerTest(unittest.TestCase):
     qt.QTimer.singleShot(msec, self.info.close)
     self.info.exec_()
 
+  # -----------------------------------
   def setUp(self):
     """ Do whatever is needed to reset the state - typically a scene clear will be enough.
     """
     slicer.mrmlScene.Clear(0)
 
+  # ----------------------------------------
   def runTest(self,scenario = None):
     """Run as few or as many tests as needed here.
     """
     self.setUp()
 
-    if scenario == "Volume":
+    if scenario   == "Volume":
       self.test_MosaicViewer_Volume()
     elif scenario == "Model":
       self.test_MosaicViewer_Model()
@@ -591,11 +646,12 @@ class MosaicViewerTest(unittest.TestCase):
     else:
       self.test_MosaicViewer_All()
 
-
+  # -------------------------------------
   def test_MosaicViewer_All(self):
       self.test_MosaicViewer_Volume()
       self.test_MosaicViewer_Model()
 
+  # ----------------------------------------
   def test_MosaicViewer_Volume(self):
     """ Test modes with 3 volumes.
     """
@@ -621,6 +677,7 @@ class MosaicViewerTest(unittest.TestCase):
     logic = MosaicViewerLogic()
     logic.viewerPerNode(nodes = volumes, viewNames = volumeNames, nodeType = "Volume")
 
+  # --------------------------------------
   def test_MosaicViewer_Model(self):
     m = slicer.util.mainWindow()
     m.moduleSelector().selectModule('MosaicViewer')
@@ -631,7 +688,7 @@ class MosaicViewerTest(unittest.TestCase):
     self.delayDisplay("Starting the test, loading data")
 
     fPath = eval('slicer.modules.mosaicviewer.path')()
-    fDirName = os.path.dirname(fPath) + '/Resources/SimpleSceneViews'
+    fDirName = os.path.dirname(fPath) + '/Resources/ComplexSceneViews'
 
     for f in os.listdir(fDirName):
       if f.endswith(".vtk"):
@@ -644,6 +701,7 @@ class MosaicViewerTest(unittest.TestCase):
     logic = MosaicViewerLogic()
     logic.viewerPerNode(nodes = models, viewNames = modelNames, nodeType = "Model")
 
+  # -------------------------------------
   def test_MosaicViewer_SceneView(self):
     self.setUp()
 
@@ -668,3 +726,5 @@ class MosaicViewerTest(unittest.TestCase):
 
     logic = MosaicViewerLogic()
     logic.renderAllSceneViewNodes()
+
+

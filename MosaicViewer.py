@@ -338,11 +338,6 @@ class MosaicViewerLogic:
     layoutDescription += '</layout>'
     self.assignLayoutDescription(layoutDescription)
 
-    viewnodes = slicer.util.getNodes('*LViewNode*')
-    if 'View1' in viewnodes:
-      print 'View1 still there! Removing it.'
-      slicer.mrmlScene.RemoveNode(viewnodes['View1'])
-
     return actualViewNames
 
 
@@ -423,7 +418,7 @@ class MosaicViewerLogic:
     self.viewerPerNode(nodes=nodes, viewNames=[n.GetName() for n in nodes], nodeType=nodeType(pattern))
 
   def renderAllSceneViewNodes(self):
-
+      
       print '=================================='
       scene = slicer.mrmlScene
 
@@ -438,30 +433,37 @@ class MosaicViewerLogic:
       if len(sv_nodes) == 0 :
         return 
 
+      nview = layoutManager.threeDViewCount 
+      viewMap = {} # View <Name, ID>
+
+      for v in range(nview):
+        threeDWidget                = layoutManager.threeDWidget(v)
+        threeDView                  = threeDWidget.threeDView() 
+        viewNode                    = threeDView.mrmlViewNode()
+        viewMap[viewNode.GetName()] = viewNode.GetID()
+
+      #print 'viewMap:', viewMap, 'nview:', nview
+
       # iterate all loaded scene view nodes
       for s in range(len(sv_nodes)):
-        sceneview = sv_nodes[s]
-
+        c_sceneview                = sv_nodes[s]
+        
         # get the models and fibre bundles from sceneview
-        sceneview_model_collection = sv_nodes[s].GetNodesByClass('vtkMRMLModelNode')
-        sceneview_fibre_collection = sv_nodes[s].GetNodesByClass('vtkMRMLfibreBundleNode')
+        sceneview_model_collection = c_sceneview.GetNodesByClass('vtkMRMLModelNode')
+        sceneview_fibre_collection = c_sceneview.GetNodesByClass('vtkMRMLfibreBundleNode')
         n_sceneview_model          = sceneview_model_collection.GetNumberOfItems()
         n_sceneview_fibre          = sceneview_fibre_collection.GetNumberOfItems()
         
         # get the s-th 3D view node
-        threeDWidget               = layoutManager.threeDWidget(s)
-        threeDView                 = threeDWidget.threeDView() 
-        viewNode                   = threeDView.mrmlViewNode()
+        # find the view with the same name as the sceneview
+        viewID               = viewMap['View' + c_sceneview.GetName()]
         
         # initialize the model and fibre iterators
-        iter_sceneview_model       = sceneview_model_collection.NewIterator()
-        iter_sceneview_fibre       = sceneview_fibre_collection.NewIterator()
+        iter_sceneview_model = sceneview_model_collection.NewIterator()
+        iter_sceneview_fibre = sceneview_fibre_collection.NewIterator()
         
-        modelMap         = {}
-        fibreMap         = {}
-
-        # DEBUG
-        print '\n', sceneview.GetName(), ':', viewNode.GetName() 
+        modelMap             = {}
+        fibreMap             = {}
 
         # save scene view models and fibres to dictionary of <ID,node>
         for m in range(n_sceneview_model):
@@ -472,53 +474,49 @@ class MosaicViewerLogic:
 
           # add this model to scene if it is not in it
           if scene.GetNodeByID(modeli.GetID()) == None:
-            print 'add ', modeli.GetName(), 'to the scene'
+            print 'adding ', modeli.GetName(), 'to the scene'
             slicer.mrmlScene.AddNode(modeli)
-            #modeli.UpdateScene(scene)
 
           modelMap[modeli.GetID()] = modeli
+
+        print '==============================='
+        print 'lmodel in sceneview', c_sceneview.GetName(), ':', modelMap.keys()
+        print '==============================='
 
         # get all model and fibre nodes from scene
         scene_model_collection = scene.GetNodesByClass('vtkMRMLModelNode')
         scene_fibre_collection = scene.GetNodesByClass('vtkMRMLfibreBundleNode')
         n_scene_model          = scene_model_collection.GetNumberOfItems()
         n_scene_fibre          = scene_fibre_collection.GetNumberOfItems()
-        iter_scene_model           = scene_model_collection.NewIterator()
-        iter_scene_fibre           = scene_fibre_collection.NewIterator()
+        iter_scene_model       = scene_model_collection.NewIterator()
+        iter_scene_fibre       = scene_fibre_collection.NewIterator()
 
+        '''
         for f in range(n_sceneview_fibre):
           fibrei = iter_sceneview_fibre.GetCurrentObject()
           iter_sceneview_fibre.GoToNextItem()
           # remove this fibre from all renders          
           fibrei.GetDisplayNode().RemoveAllViewNodeIDs()
           fibreMap[fibrei.GetID()] = fibrei
-
-        slicer.mrmlScene.StartState(0x0001)
+        '''
 
         for m in range(n_scene_model):
           modeli = iter_scene_model.GetCurrentObject()
 
           # see if this node is in the current sceneview
           if modeli.GetID() in modelMap:
-            displayNode = modeli.GetDisplayNode()
-            #slicer.mrmlScene.AddNode(displayNode)
-            #displayNode.RemoveAllViewNodeIDs()
-            modeli.AddAndObserveDisplayNodeID(displayNode.GetID()) 
-            displayNode.AddViewNodeID(viewNode.GetID())
-            displayNode.SetVisibility(False)
-            modeli.SetDisplayVisibility(1)
-
-            print 'Add model ', modeli.GetName(), 'to ', viewNode.GetName()
-            #print modeli.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
-
-          else:
-            print modeli.GetName(), 'not in the scene!!!!!!!'
+            visibleInSceneView =  modelMap[modeli.GetID()].GetDisplayNode().GetVisibility()
+            print modeli.GetName(), 'visible:', visibleInSceneView, ' in ', viewID
+            if visibleInSceneView:
+              displayNode = modeli.GetDisplayNode()
+              modeli.AddAndObserveDisplayNodeID(displayNode.GetID()) # TODO: check if necessary
+              print 'adding model ', modeli.GetName(), ' to view', viewID
+              displayNode.AddViewNodeID(viewID)
+              modeli.SetDisplayVisibility(1)
 
           modeli.UpdateScene(scene)
 
           iter_scene_model.GoToNextItem()
-
-        slicer.mrmlScene.EndState(0x0001)
 
         '''
         for f in range(nfibre):
@@ -532,7 +530,7 @@ class MosaicViewerLogic:
           print 'After Adding ID',fibrei.GetName(), ': ' , displayNode.GetNumberOfViewNodeIDs()
           iter_fibre.GoToNextItem()
         '''
-
+      print 'finished loading all scene views'
     
 class MosaicViewerTest(unittest.TestCase):
   """

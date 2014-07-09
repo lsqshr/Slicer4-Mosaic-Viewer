@@ -12,13 +12,13 @@ class MosaicViewer:
     parent.title        = "Mosaic Viewer"
     parent.categories   = ["Wizards"]
     parent.dependencies = []
-    parent.contributors = ["Sidong Liu (USYD, BWH), Siqi Liu (USYD), Sonia Pujol (BWH)"]
+    parent.contributors = ["Siqi Liu (USYD), Sidong Liu (USYD, BWH), Sonia Pujol (BWH)"]
     parent.helpText     = """
-    This module creates mosaic views of multiple volumes and models
+    This module creates mosaic views of multiple scene views
     """
     parent.acknowledgementText = """
-    This f was developed by Siqi Liu, University of Sydney, Sidong Liu, University of Sydney and Brigham and Women's
-    Hospital and Sonia Pujol, Brigham and Women's Hospital, and was partially supported by ARC, AADRF, NIH NA-MIC
+    This module was developed by Siqi Liu, University of Sydney, Sidong Liu, University of Sydney and Brigham and Women's
+    Hospital, and Sonia Pujol, Brigham and Women's Hospital, and was partially supported by ARC, AADRF, NIH NA-MIC
     (U54EB005149) and NIH NAC (P41EB015902).
     """ 
 
@@ -68,7 +68,6 @@ def numericInputFrame(parent, label, tooltip, minimum, maximum, step, decimals):
 #
 # MosaicViewerWidget
 #
-
 class MosaicViewerWidget:
   # ---------------------------
   def __init__(self, parent = None):
@@ -479,7 +478,24 @@ class MosaicViewerLogic:
   def renderAllSceneViewNodes(self, state = None):
 
       print '*************** Start loading the scene views ***************'
+
+      """ @ Deprecated
+      # get all model and fiber nodes from scene
       scene = slicer.mrmlScene
+      scene_model_collection = scene.GetNodesByClass('vtkMRMLModelNode')
+      scene_fiber_collection = scene.GetNodesByClass('vtkMRMLFiberBundleNode')
+      n_scene_model          = scene_model_collection.GetNumberOfItems()
+      n_scene_fiber          = scene_fiber_collection.GetNumberOfItems()
+      iter_scene_model       = scene_model_collection.NewIterator()
+      iter_scene_fiber       = scene_fiber_collection.NewIterator()
+      """
+
+    
+      # new implementation using vtkMRMLModelDisplayNode instead of vtkMRMLModelNode
+      scene = slicer.mrmlScene
+      scene_display_collection  = scene.GetNodesByClass('vtkMRMLDisplayNode')
+      n_scene_display           = scene_display_collection.GetNumberOfItems()
+      iter_scene_display        = scene_display_collection.NewIterator()
 
       # Find loaded sceneviews
       nodes_dict = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
@@ -511,24 +527,25 @@ class MosaicViewerLogic:
         viewNode                    = threeDView.mrmlViewNode()
         viewMap[viewNode.GetName()] = viewNode.GetID()
 
+
       # iterate all loaded scene view nodes
       for s in range(len(sv_nodes)):
 
         # get current sceneview
         # c_sceneview                = sv_nodes[s]
-        c_sceneview                = nodes_dict[sceneviewNames[s]]
+        c_sceneview                = nodes_dict[sceneviewNames[s]] 
+        # find the view with the same name as the sceneview
+        viewID               = viewMap['View' + c_sceneview.GetName()]
         
         # start a scene status, deprecated
         # slicer.mrmlScene.StartState(0x0001)
 
+        """ @ Deprecated
         # get the models and fiber bundles from current sceneview
         sceneview_model_collection = c_sceneview.GetNodesByClass('vtkMRMLModelNode')
         sceneview_fiber_collection = c_sceneview.GetNodesByClass('vtkMRMLFiberBundleNode')
         n_sceneview_model          = sceneview_model_collection.GetNumberOfItems()
-        n_sceneview_fiber          = sceneview_fiber_collection.GetNumberOfItems()
-
-        # find the view with the same name as the sceneview
-        viewID               = viewMap['View' + c_sceneview.GetName()]
+        n_sceneview_fiber          = sceneview_fiber_collection.GetNumberOfItems()        
         
         # initialize the model and fiber iterators
         iter_sceneview_model = sceneview_model_collection.NewIterator()
@@ -548,10 +565,11 @@ class MosaicViewerLogic:
             print '- remove the view nodes for ', modeli.GetName()
             modeli.GetDisplayNode().RemoveAllViewNodeIDs()    
 
-          # add this model to scene if it is not in it
-          if scene.GetNodeByID(modeli.GetID()) == None:
-            # print '+ adding ', modeli.GetName(), 'to the scene'
-            slicer.mrmlScene.AddNode(modeli)
+          # # add this model to scene if it is not in it
+          # if scene.GetNodeByID(modeli.GetID()) == None:
+          #   # print '+ adding ', modeli.GetName(), 'to the scene'
+          #   slicer.mrmlScene.AddNode(modeli)
+
           if modeli.GetDisplayVisibility():            
             modelMap[modeli.GetID()] = modeli
 
@@ -570,24 +588,19 @@ class MosaicViewerLogic:
             fiberi.GetTubeDisplayNode().RemoveAllViewNodeIDs()
             fiberi.GetGlyphDisplayNode().RemoveAllViewNodeIDs()
 
-          # add this fiber to scene if it is not in it
-          if scene.GetNodeByID(fiberi.GetID()) == None:
-            # print '+ adding ', fiberi.GetName(), 'to the scene'
-            slicer.mrmlScene.AddNode(fiberi)
+          # # add this fiber to scene if it is not in it
+          # if scene.GetNodeByID(fiberi.GetID()) == None:
+          #   # print '+ adding ', fiberi.GetName(), 'to the scene'
+          #   slicer.mrmlScene.AddNode(fiberi)
           if fiberi.GetDisplayVisibility():
             fiberMap[fiberi.GetID()] = fiberi
 
         print '-------------------------------'
         print '= lfiber in sceneview', c_sceneview.GetName(), ':', fiberMap.keys()
         
-        # get all model and fiber nodes from scene
-        scene_model_collection = scene.GetNodesByClass('vtkMRMLModelNode')
-        scene_fiber_collection = scene.GetNodesByClass('vtkMRMLFiberBundleNode')
-        n_scene_model          = scene_model_collection.GetNumberOfItems()
-        n_scene_fiber          = scene_fiber_collection.GetNumberOfItems()
-        iter_scene_model       = scene_model_collection.NewIterator()
-        iter_scene_fiber       = scene_fiber_collection.NewIterator()
-
+        # iterate models in the scene
+        iter_scene_model.GoToFirstItem()
+        iter_scene_fiber.GoToFirstItem()
 
         for m in range(n_scene_model):
           modeli = iter_scene_model.GetCurrentObject()
@@ -642,6 +655,40 @@ class MosaicViewerLogic:
 
         # end a scene state, deprecated 
         # slicer.mrmlScene.EndState(0x0001)
+        """
+       
+        # new implementation using the vtkMRMLDisplayNode instead of the vtkMRMLModelNode and vtkMRMLFiberBundleNode
+        
+        # find what's in this scene view
+        sceneview_display_collection  = c_sceneview.GetNodesByClass('vtkMRMLDisplayNode')
+        n_sceneview_display           = sceneview_display_collection.GetNumberOfItems()
+        iter_sceneview_display        = sceneview_display_collection.NewIterator()
+        displayMap                    = {} # display node <ID, node>
+
+        for d in range(n_sceneview_display):
+          displayi = iter_sceneview_display.GetCurrentObject()
+          iter_sceneview_display.GoToNextItem()
+          #  remove this display node from all renders
+          if displayi.GetNumberOfViewNodeIDs() == 0:
+            print '--------------------------------'
+            print '- remove the view nodes for ', displayi.GetName() 
+            displayi.RemoveAllViewNodeIDs()
+          if displayi.GetVisibility():
+            displayMap[displayi.GetID()] = displayi
+        
+        #  check whether the display node in scene can be found in 
+        iter_scene_display.GoToFirstItem()
+
+        for d in range(n_scene_display):
+          displayi = iter_scene_display.GetCurrentObject()
+          iter_scene_display.GoToNextItem()
+          # see if this node is in the current sceneview
+          if displayi.GetID() in displayMap:
+            displayi.AddViewNodeID(viewID)
+            displayi.SetVisibility(1)
+          # elif displayi.GetVisibility() == 1:
+          #   displayi.AddViewNodeID(viewID)
+
 
       print '*********** Finish loading all scene views *************'
 

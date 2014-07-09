@@ -489,7 +489,6 @@ class MosaicViewerLogic:
       iter_scene_model       = scene_model_collection.NewIterator()
       iter_scene_fiber       = scene_fiber_collection.NewIterator()
       """
-
     
       # new implementation using vtkMRMLModelDisplayNode instead of vtkMRMLModelNode
       scene = slicer.mrmlScene
@@ -527,7 +526,6 @@ class MosaicViewerLogic:
         viewNode                    = threeDView.mrmlViewNode()
         viewMap[viewNode.GetName()] = viewNode.GetID()
 
-
       # iterate all loaded scene view nodes
       for s in range(len(sv_nodes)):
 
@@ -537,10 +535,10 @@ class MosaicViewerLogic:
         # find the view with the same name as the sceneview
         viewID               = viewMap['View' + c_sceneview.GetName()]
         
+        """ @ Deprecated
         # start a scene status, deprecated
         # slicer.mrmlScene.StartState(0x0001)
 
-        """ @ Deprecated
         # get the models and fiber bundles from current sceneview
         sceneview_model_collection = c_sceneview.GetNodesByClass('vtkMRMLModelNode')
         sceneview_fiber_collection = c_sceneview.GetNodesByClass('vtkMRMLFiberBundleNode')
@@ -688,7 +686,6 @@ class MosaicViewerLogic:
             displayi.SetVisibility(1)
           # elif displayi.GetVisibility() == 1:
           #   displayi.AddViewNodeID(viewID)
-
 
       print '*********** Finish loading all scene views *************'
 

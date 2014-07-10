@@ -494,7 +494,16 @@ class MosaicViewerLogic:
       scene = slicer.mrmlScene
       scene_display_collection  = scene.GetNodesByClass('vtkMRMLDisplayNode')
       n_scene_display           = scene_display_collection.GetNumberOfItems()
-      iter_scene_display        = scene_display_collection.NewIterator()
+      
+      # original number of view nodes for each display node, '0' means associated with all view nodes
+      # numberOfViews       = []
+      # print '--------------------------------'
+      # for d in range(n_scene_display):
+      #   displayi          = iter_scene_display.GetCurrentObject()
+      #   iter_scene_display.GoToNextItem()
+      #   numberOfViews.append(displayi.GetNumberOfViewNodeIDs())
+      #   print displayi.GetName(), ': ', numberOfViews[d]
+
 
       # Find loaded sceneviews
       nodes_dict = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
@@ -531,9 +540,10 @@ class MosaicViewerLogic:
 
         # get current sceneview
         # c_sceneview                = sv_nodes[s]
-        c_sceneview                = nodes_dict[sceneviewNames[s]] 
+        c_sceneview                 = nodes_dict[sceneviewNames[s]] 
         # find the view with the same name as the sceneview
-        viewID               = viewMap['View' + c_sceneview.GetName()]
+        viewName                    = 'View' + c_sceneview.GetName()
+        viewID                      = viewMap[viewName]
         
         """ @ Deprecated
         # start a scene status, deprecated
@@ -658,34 +668,61 @@ class MosaicViewerLogic:
         # new implementation using the vtkMRMLDisplayNode instead of the vtkMRMLModelNode and vtkMRMLFiberBundleNode
         
         # find what's in this scene view
-        sceneview_display_collection  = c_sceneview.GetNodesByClass('vtkMRMLDisplayNode')
-        n_sceneview_display           = sceneview_display_collection.GetNumberOfItems()
-        iter_sceneview_display        = sceneview_display_collection.NewIterator()
-        displayMap                    = {} # display node <ID, node>
+        sceneview_display_collection    = c_sceneview.GetNodesByClass('vtkMRMLDisplayNode')
+        n_sceneview_display             = sceneview_display_collection.GetNumberOfItems()
+        displayMap                      = {} # display node <ID, node>
+
+        
+        """
+        # @TODO: restore the exact position of the scene view
+        sceneview_node_collection       = c_sceneview.GetNodesByClass('vtkMRMLNode')
+        n_sceneview_transformable       = sceneview_node_collection.GetNumberOfItems()
+        
+        sceneview_view_collection       = c_sceneview.GetNodesByClass('vtkMRMLViewNode')
+        n_sceneview_view                = sceneview_view_collection.GetNumberOfItems()
+        originalViewNode                = sceneview_view_collection.GetItemAsObject(0)
+        originalViewNode.UpdateScene(scene)
+        
+        viewNode                        = slicer.mrmlScene.GetNodeByID(viewID)
+        viewNode.Copy(originalViewNode)
+        viewNode.SetName(viewName)
+        viewNode.UpdateScene(scene)
+
+        print '-------------------------------------------'
+        for t in range(n_sceneview_transformable):
+          node = sceneview_node_collection.GetItemAsObject(t)
+          sv_node = scene.GetNodeByID(node.GetID())
+          if sv_node is not None:
+            print '= ', node.GetClassName()
+            sv_node.UpdateScene(scene)
+          else:
+            print '+ ', node.GetClassName()
+            sv_node = node.CreateNodeInstance();
+            sv_node.CopyWithScene(node)
+            sv_node.UpdateScene(scene)
+
+        print '-------------------------------------------'
+        print 'Number of view nodes:          ', n_sceneview_view
+        print 'Number of display nodes:       ', n_sceneview_display
+        print 'Number of transformable nodes: ', n_sceneview_transformable
+        print originalViewNode.GetName(), ' vs. ', viewNode.GetName()
+        """
+        
+
 
         for d in range(n_sceneview_display):
-          displayi = iter_sceneview_display.GetCurrentObject()
-          iter_sceneview_display.GoToNextItem()
-          #  remove this display node from all renders
-          if displayi.GetNumberOfViewNodeIDs() == 0:
-            print '--------------------------------'
-            print '- remove the view nodes for ', displayi.GetName() 
-            displayi.RemoveAllViewNodeIDs()
+          displayi = sceneview_display_collection.GetItemAsObject(d)
+          displayi.UpdateScene(scene)
           if displayi.GetVisibility():
             displayMap[displayi.GetID()] = displayi
-        
-        #  check whether the display node in scene can be found in 
-        iter_scene_display.GoToFirstItem()
 
         for d in range(n_scene_display):
-          displayi = iter_scene_display.GetCurrentObject()
-          iter_scene_display.GoToNextItem()
+          displayi = scene_display_collection.GetItemAsObject(d)
           # see if this node is in the current sceneview
           if displayi.GetID() in displayMap:
             displayi.AddViewNodeID(viewID)
             displayi.SetVisibility(1)
-          # elif displayi.GetVisibility() == 1:
-          #   displayi.AddViewNodeID(viewID)
+
 
       print '*********** Finish loading all scene views *************'
 

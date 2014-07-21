@@ -501,27 +501,25 @@ class MosaicViewerLogic:
       
       print '------------------------------------------'
       if state is not None:
-        print state.layoutMethod, state.nRows, state.nColumns
+        print state.layoutMethod, 'Layout: ', state.nRows, ' * ', state.nColumns
         self.makeLayout(1, 'dummy', 1, 1)
 
     
       # new implementation using vtkMRMLModelDisplayNode instead of vtkMRMLModelNode
       scene                     = slicer.mrmlScene
-      scene_display_collection  = scene.GetNodesByClass('vtkMRMLDisplayNode')
-      n_scene_display           = scene_display_collection.GetNumberOfItems()
 
       # remove all previous view nodes
       lViewNode   = scene.GetNodesByClass('vtkMRMLViewNode')
 
       for v in range(lViewNode.GetNumberOfItems()):
         viewNodeToRemove    = lViewNode.GetItemAsObject(v)
-        print 'Removing view: ', viewNodeToRemove.GetName()
+        print ' - Removing view: ', viewNodeToRemove.GetName()
         scene.RemoveNode(viewNodeToRemove)
 
       lCameraNode = scene.GetNodesByClass('vtkMRMLCameraNode')
       for c in range(lCameraNode.GetNumberOfItems()):
         cameraNodeToRemove  = lCameraNode.GetItemAsObject(c)
-        print 'Remove camera: ', cameraNodeToRemove.GetName()
+        print ' - Remove camera: ', cameraNodeToRemove.GetName()
         scene.RemoveNode(cameraNodeToRemove)
         
       
@@ -569,7 +567,8 @@ class MosaicViewerLogic:
         threeDView                      = threeDWidget.threeDView() 
         viewNode                        = threeDView.mrmlViewNode()
         scene.AddNode(viewNode)
-        viewMap[viewNode.GetName()]     = viewNode.GetID()      
+        viewMap[viewNode.GetName()]     = viewNode.GetID()   
+        threeDViewMap[viewNode.GetName()] = threeDView   
 
       # iterate all loaded scene view nodes
       for s in range(len(sv_nodes)):
@@ -580,6 +579,7 @@ class MosaicViewerLogic:
         # find the view with the same name as the sceneview
         viewName              = 'View' + c_sceneview.GetName()
         viewID                = viewMap[viewName]
+        threeDView            = threeDViewMap[viewName]
         
 
         """ @ Deprecated
@@ -701,35 +701,54 @@ class MosaicViewerLogic:
         # end a scene state, deprecated 
         # slicer.mrmlScene.EndState(0x0001)
         """
-       
-        # new implementation using the vtkMRMLDisplayNode instead of the vtkMRMLModelNode and vtkMRMLFiberBundleNode
+      
         
-        # find what's in this scene view
+        # add nodes in sceneview to scene
+        print '-------------------------------------------'
+        sceneview_node_collection       = c_sceneview.GetNodesByClass('vtkMRMLNode')
+        n_sceneview_node                = sceneview_node_collection.GetNumberOfItems()
+
+        for n in range(n_sceneview_node):
+          sv_nodei                      = sceneview_node_collection.GetItemAsObject(n)
+          if scene.GetNodeByID(sv_nodei.GetID()) is None:
+            scene.AddNode(sv_nodei)
+            print ' + Adding node  : ', sv_nodei.GetID()
+          else:
+            print ' = Existing node: ', sv_nodei.GetID()
+
+        # find the display models are in this scene view
         sceneview_display_collection    = c_sceneview.GetNodesByClass('vtkMRMLDisplayNode')
         n_sceneview_display             = sceneview_display_collection.GetNumberOfItems()
-        displayMap                      = {} # display node <ID, node>
-        
         for d in range(n_sceneview_display):
-          displayi = sceneview_display_collection.GetItemAsObject(d)
-          displayi.UpdateScene(scene)
+          displayi                      = sceneview_display_collection.GetItemAsObject(d)
+          s_displayi                    = scene.GetNodeByID(displayi.GetID())
           if displayi.GetVisibility():
-            displayMap[displayi.GetID()] = displayi
+            s_displayi.AddViewNodeID(viewID)
+            s_displayi.SetVisibility(1)
+          else:
+            s_displayi.RemoveViewNodeID(viewID)
 
-        for d in range(n_scene_display):
-          displayi = scene_display_collection.GetItemAsObject(d)
-          # see if this node is in the current sceneview
-          if displayi.GetID() in displayMap:
-            displayi.AddViewNodeID(viewID)
-            displayi.SetVisibility(1)
+        # find the 2D slices in the scene view
+        sceneview_slice_collection      = c_sceneview.GetNodesByClass('vtkMRMLSliceNode')
+        n_sceneview_slice               = sceneview_slice_collection.GetNumberOfItems()
+        for d in range(n_sceneview_slice):
+          slicei                        = sceneview_slice_collection.GetItemAsObject(d)
+          s_slicei                      = scene.GetNodeByID(slicei.GetID())
+          if slicei.GetSliceVisible():
+            s_slicei.AddThreeDViewID(viewID)
+            s_slicei.SetSliceVisible(1)
+          else:
+            print ' * Missing node : ', slicei.GetID()
+            s_slicei.RemoveThreeDViewID(viewID)
 
-        # @TODO: restore the exact position of the scene view
+
         # copy the attributes of the original view nodes to the new view node
         sceneview_view_collection       = c_sceneview.GetNodesByClass('vtkMRMLViewNode')
         n_sceneview_view                = sceneview_view_collection.GetNumberOfItems()
         originalViewNode                = sceneview_view_collection.GetItemAsObject(0)
-        viewNode                        = scene.GetNodeByID(viewID)
-        viewNode.Copy(originalViewNode)
-        viewNode.SetName(viewName)
+        # viewNode                        = scene.GetNodeByID(viewID)
+        # viewNode.Copy(originalViewNode)
+        # viewNode.SetName(viewName)
         
         # Restore the position
         print '-------------------------------------------'
@@ -740,14 +759,13 @@ class MosaicViewerLogic:
         
         for svc in range(nsvcamera):
           sceneviewCameraNode         = sceneviewCameraNodeCollection.GetItemAsObject(svc)
-          # scene.AddNode(sceneviewCameraNode)
-          # print sceneviewCameraNode.GetActiveTag()
           if sceneviewCameraNode.GetActiveTag() == originalViewNode.GetID():
-            c_sceneviewCameraNode     = sceneviewCameraNodeCollection.GetItemAsObject(svc)
-            print ' Found the camera node:    ', originalViewNode.GetID(), ' - ', c_sceneviewCameraNode.GetID()
-            print ' Restore camera position:  ', c_sceneviewCameraNode.GetCamera().GetPosition()
+            print ' Found the camera node:    ', originalViewNode.GetID(), ' - ', sceneviewCameraNode.GetID()
+            c_sceneCameraNode         = scene.GetNodeByID(sceneCameraNode.GetID())
+            c_sceneCameraNode.Copy(sceneviewCameraNode)
+            c_sceneCameraNode.UpdateScene(scene)
+            print ' Restore camera position:  ', sceneviewCameraNode.GetCamera().GetPosition()
 
-        sceneCameraNode.Copy(c_sceneviewCameraNode)
         # print 'Scene Camera Node Reference vs. Sceneview Camera Node Reference'
         # print sceneCameraNode.GetReferenceCount(),     ' vs. ', sceneviewCameraNode.GetReferenceCount()
 

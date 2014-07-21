@@ -209,7 +209,7 @@ class MosaicViewerWidget:
 
     updateGUI()
     self.updateGUI  = updateGUI
-    self.state = state
+    self.state      = state
 
     #
     # Execution Area
@@ -217,17 +217,17 @@ class MosaicViewerWidget:
     # Add vertical spacer
     self.layout.addStretch(1)
 
-    buttonFrame = qt.QFrame(self.parent)
+    buttonFrame                   = qt.QFrame(self.parent)
     buttonFrame.setLayout(qt.QHBoxLayout())
     self.layout.addWidget(buttonFrame)
 
-    self.restoreDefaults = qt.QPushButton("Restore Defaults")
-    self.restoreDefaults.toolTip = "Restore the default settings"
+    self.restoreDefaults          = qt.QPushButton("Restore Defaults")
+    self.restoreDefaults.toolTip  = "Restore the default settings"
     buttonFrame.layout().addWidget(self.restoreDefaults)
     self.restoreDefaults.connect('clicked()', self.onRestore)
 
-    self.applyButton = qt.QPushButton("Apply")
-    self.applyButton.toolTip = "Apply Mosaic Viewer"
+    self.applyButton              = qt.QPushButton("Apply")
+    self.applyButton.toolTip      = "Apply Mosaic Viewer"
     buttonFrame.layout().addWidget(self.applyButton)
     self.applyButton.connect('clicked()', self.onApply)
 
@@ -336,21 +336,13 @@ class MosaicViewerLogic:
     layoutNode.SetViewArrangement(layoutNode.SlicerLayoutUserView)
 
   # ------------------------------------
-  def makeLayout(self, nodes, sceneviewNames, nRows = 1, nColumns = 1):
-    # remove all previous view nodes
-    # lViewNode = slicer.util.getNodes('*LViewNode*')
-    # scene = slicer.mrmlScene
-
-    # for key in lViewNode:
-    #   print 'Removing view:', lViewNode[key].GetName()
-    #   scene.RemoveNode(lViewNode[key])
-
+  def makeLayout(self, nNodes, sceneviewNames, nRows = 1, nColumns = 1):
+    
     import math
     # make an default display layout array, e.g.:
     # nvolumes = 3 -> 2 x 2 (nrows = ncolumes, with only one volume in second row)
     # nvolumes = 5 -> 2 x 3 (nrows < ncolumes, with only two volumes in second row)
     # nvoluems = 11 -> 3 x 4 (nrows < ncolums, with only three volumes in the third row)
-    nNodes = len(nodes)
     
     if nNodes > nRows * nColumns or nRows is None or nColumns is None:
       qNNodes = math.sqrt(nNodes)
@@ -475,6 +467,23 @@ class MosaicViewerLogic:
     return len(lViewNode.keys()) - (nSceneViewNode - sceneViewIndex)
 
   # ------------------------------------------
+  def _getCamera(self, sv_nodes, nodes_dict, sceneviewNames):
+    """
+    Extract the camera nodes from the scene views
+    """
+    cameraNodeCollection              = [] # cameraNode collection
+    for s in range(len(sv_nodes)):
+      c_sceneview                     = nodes_dict[sceneviewNames[s]] 
+      sceneviewCameraNode             = c_sceneview.GetNodesByClass('vtkMRMLCameraNode').GetItemAsObject(0)
+      newCameraNode                   = sceneviewCameraNode.CreateNodeInstance()
+      newCameraNode.Copy(sceneviewCameraNode)
+      cameraNodeCollection.append(newCameraNode)
+    for i in range(len(sv_nodes)):
+      print '= Camera Position: ', i, ' ', cameraNodeCollection[i].GetCamera().GetPosition()
+
+    return cameraNodeCollection
+
+  # ------------------------------------------
   def renderAllSceneViewNodes(self, state = None):
 
       print '*************** Start loading the scene views ***************'
@@ -489,11 +498,32 @@ class MosaicViewerLogic:
       iter_scene_model       = scene_model_collection.NewIterator()
       iter_scene_fiber       = scene_fiber_collection.NewIterator()
       """
+      
+      print '------------------------------------------'
+      if state is not None:
+        print state.layoutMethod, state.nRows, state.nColumns
+        self.makeLayout(1, 'dummy', 1, 1)
+
     
       # new implementation using vtkMRMLModelDisplayNode instead of vtkMRMLModelNode
-      scene = slicer.mrmlScene
+      scene                     = slicer.mrmlScene
       scene_display_collection  = scene.GetNodesByClass('vtkMRMLDisplayNode')
       n_scene_display           = scene_display_collection.GetNumberOfItems()
+
+      # remove all previous view nodes
+      lViewNode   = scene.GetNodesByClass('vtkMRMLViewNode')
+
+      for v in range(lViewNode.GetNumberOfItems()):
+        viewNodeToRemove    = lViewNode.GetItemAsObject(v)
+        print 'Removing view: ', viewNodeToRemove.GetName()
+        scene.RemoveNode(viewNodeToRemove)
+
+      lCameraNode = scene.GetNodesByClass('vtkMRMLCameraNode')
+      for c in range(lCameraNode.GetNumberOfItems()):
+        cameraNodeToRemove  = lCameraNode.GetItemAsObject(c)
+        print 'Remove camera: ', cameraNodeToRemove.GetName()
+        scene.RemoveNode(cameraNodeToRemove)
+        
       
       # original number of view nodes for each display node, '0' means associated with all view nodes
       # numberOfViews       = []
@@ -503,7 +533,6 @@ class MosaicViewerLogic:
       #   iter_scene_display.GoToNextItem()
       #   numberOfViews.append(displayi.GetNumberOfViewNodeIDs())
       #   print displayi.GetName(), ': ', numberOfViews[d]
-
 
       # Find loaded sceneviews
       nodes_dict = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
@@ -518,33 +547,41 @@ class MosaicViewerLogic:
       # Scene view names, sorted in alphabetical order
       sceneviewNames = [n.GetName() for n in sv_nodes]
       sceneviewNames.sort()
+
+      # extract the camera nodes and add to the scene, must be done before making layout
+      # cameraNodeCollection              = self._getCamera(sv_nodes, nodes_dict, sceneviewNames)
       
       # Make the layout according to the # scene view nodes
       if state is None or state.layoutMethod == 'Default':
-        self.makeLayout(sv_nodes, sceneviewNames)
+        self.makeLayout(len(sv_nodes), sceneviewNames)
       else:
-        self.makeLayout(sv_nodes, sceneviewNames, state.nRows, state.nColumns)
+        self.makeLayout(len(sv_nodes), sceneviewNames, state.nRows, state.nColumns)
 
-      layoutManager = slicer.app.layoutManager()
-      nview = layoutManager.threeDViewCount 
-      viewMap = {} # View <Name, ID>
+      layoutManager                     = slicer.app.layoutManager()
+      nview                             = layoutManager.threeDViewCount 
+      threeDViewMap                     = {} # ThreeDView <ID, Node>
+      viewMap                           = {} # View Node <Name, ID>
+
+      sceneCameraNodeCollection         = scene.GetNodesByClass('vtkMRMLCameraNode')
 
       for v in range(nview):
-        threeDWidget                = layoutManager.threeDWidget(v)
-        threeDView                  = threeDWidget.threeDView() 
-        viewNode                    = threeDView.mrmlViewNode()
-        viewMap[viewNode.GetName()] = viewNode.GetID()
+        threeDWidget                    = layoutManager.threeDWidget(v)
+        threeDView                      = threeDWidget.threeDView() 
+        viewNode                        = threeDView.mrmlViewNode()
+        scene.AddNode(viewNode)
+        viewMap[viewNode.GetName()]     = viewNode.GetID()      
 
       # iterate all loaded scene view nodes
       for s in range(len(sv_nodes)):
 
         # get current sceneview
         # c_sceneview                = sv_nodes[s]
-        c_sceneview                 = nodes_dict[sceneviewNames[s]] 
+        c_sceneview           = nodes_dict[sceneviewNames[s]] 
         # find the view with the same name as the sceneview
-        viewName                    = 'View' + c_sceneview.GetName()
-        viewID                      = viewMap[viewName]
+        viewName              = 'View' + c_sceneview.GetName()
+        viewID                = viewMap[viewName]
         
+
         """ @ Deprecated
         # start a scene status, deprecated
         # slicer.mrmlScene.StartState(0x0001)
@@ -671,45 +708,7 @@ class MosaicViewerLogic:
         sceneview_display_collection    = c_sceneview.GetNodesByClass('vtkMRMLDisplayNode')
         n_sceneview_display             = sceneview_display_collection.GetNumberOfItems()
         displayMap                      = {} # display node <ID, node>
-
         
-        """
-        # @TODO: restore the exact position of the scene view
-        sceneview_node_collection       = c_sceneview.GetNodesByClass('vtkMRMLNode')
-        n_sceneview_transformable       = sceneview_node_collection.GetNumberOfItems()
-        
-        sceneview_view_collection       = c_sceneview.GetNodesByClass('vtkMRMLViewNode')
-        n_sceneview_view                = sceneview_view_collection.GetNumberOfItems()
-        originalViewNode                = sceneview_view_collection.GetItemAsObject(0)
-        originalViewNode.UpdateScene(scene)
-        
-        viewNode                        = slicer.mrmlScene.GetNodeByID(viewID)
-        viewNode.Copy(originalViewNode)
-        viewNode.SetName(viewName)
-        viewNode.UpdateScene(scene)
-
-        print '-------------------------------------------'
-        for t in range(n_sceneview_transformable):
-          node = sceneview_node_collection.GetItemAsObject(t)
-          sv_node = scene.GetNodeByID(node.GetID())
-          if sv_node is not None:
-            print '= ', node.GetClassName()
-            sv_node.UpdateScene(scene)
-          else:
-            print '+ ', node.GetClassName()
-            sv_node = node.CreateNodeInstance();
-            sv_node.CopyWithScene(node)
-            sv_node.UpdateScene(scene)
-
-        print '-------------------------------------------'
-        print 'Number of view nodes:          ', n_sceneview_view
-        print 'Number of display nodes:       ', n_sceneview_display
-        print 'Number of transformable nodes: ', n_sceneview_transformable
-        print originalViewNode.GetName(), ' vs. ', viewNode.GetName()
-        """
-        
-
-
         for d in range(n_sceneview_display):
           displayi = sceneview_display_collection.GetItemAsObject(d)
           displayi.UpdateScene(scene)
@@ -723,6 +722,56 @@ class MosaicViewerLogic:
             displayi.AddViewNodeID(viewID)
             displayi.SetVisibility(1)
 
+        # @TODO: restore the exact position of the scene view
+        # copy the attributes of the original view nodes to the new view node
+        sceneview_view_collection       = c_sceneview.GetNodesByClass('vtkMRMLViewNode')
+        n_sceneview_view                = sceneview_view_collection.GetNumberOfItems()
+        originalViewNode                = sceneview_view_collection.GetItemAsObject(0)
+        viewNode                        = scene.GetNodeByID(viewID)
+        viewNode.Copy(originalViewNode)
+        viewNode.SetName(viewName)
+        
+        # Restore the position
+        print '-------------------------------------------'
+        sceneCameraNode               = sceneCameraNodeCollection.GetItemAsObject(s)
+        sceneviewCameraNodeCollection = c_sceneview.GetNodesByClass('vtkMRMLCameraNode')
+        nsvcamera                     = sceneviewCameraNodeCollection.GetNumberOfItems()
+        print ' Number of Camera Nodes:', nsvcamera
+        
+        for svc in range(nsvcamera):
+          sceneviewCameraNode         = sceneviewCameraNodeCollection.GetItemAsObject(svc)
+          # scene.AddNode(sceneviewCameraNode)
+          # print sceneviewCameraNode.GetActiveTag()
+          if sceneviewCameraNode.GetActiveTag() == originalViewNode.GetID():
+            c_sceneviewCameraNode     = sceneviewCameraNodeCollection.GetItemAsObject(svc)
+            print ' Found the camera node:    ', originalViewNode.GetID(), ' - ', c_sceneviewCameraNode.GetID()
+            print ' Restore camera position:  ', c_sceneviewCameraNode.GetCamera().GetPosition()
+
+        sceneCameraNode.Copy(c_sceneviewCameraNode)
+        # print 'Scene Camera Node Reference vs. Sceneview Camera Node Reference'
+        # print sceneCameraNode.GetReferenceCount(),     ' vs. ', sceneviewCameraNode.GetReferenceCount()
+
+        """
+        # get the scene camera nodes and the sceneview camera node 
+        sceneview_node_collection       = c_sceneview.GetNodesByClass('vtkMRMLNode')
+        n_sceneview_node                = sceneview_node_collection.GetNumberOfItems()
+
+
+        for t in range(n_sceneview_camera):
+          node = sceneview_node_collection.GetItemAsObject(t)
+          sv_node = scene.GetNodeByID(node.GetID())
+          if sv_node is not None:
+            print '= ', sv_node.GetID()
+            sv_node.UpdateScene(scene)
+          else:
+            print '+ ', node.GetClassName()
+            sv_node = node.CreateNodeInstance()
+            sv_node.CopyWithScene(node)
+            scene.AddNode(sv_node)
+            sv_node.UpdateScene(scene)
+
+        # """
+        
 
       print '*********** Finish loading all scene views *************'
 

@@ -711,6 +711,8 @@ class MosaicViewerLogic:
         for n in range(n_sceneview_node):
           sv_nodei                      = sceneview_node_collection.GetItemAsObject(n)
           if scene.GetNodeByID(sv_nodei.GetID()) is None:
+            # nodei                       = sv_nodei.CreateNodeInstance()
+            # nodei.CopyWithScene(sv_nodei)
             scene.AddNode(sv_nodei)
             print ' + Adding node  : ', sv_nodei.GetID()
           else:

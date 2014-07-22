@@ -1,3 +1,5 @@
 /test_script.txt
 *pyc
 *.mrml
+/temp*
+.gitignore

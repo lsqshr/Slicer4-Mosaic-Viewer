@@ -122,36 +122,7 @@ class MosaicViewerWidget:
         button.toolTip              = "Reload this module and then run the self test on %s." % scenario
         reloadFormLayout.addWidget(button)
         button.connect('clicked()', lambda s = scenario: self.onReloadAndTest(scenario = s))
-
-    """
-    #
-    # Input Data Selection Area
-    #
-    dataSelectionCollapsibleButtion       = ctk.ctkCollapsibleButton()
-    dataSelectionCollapsibleButtion.text  = "Select the Volumes && Models"
-    self.layout.addWidget(dataSelectionCollapsibleButtion)
-    dataSelectionFormLayout               = qt.QFormLayout(dataSelectionCollapsibleButtion)
-
-    dataSelectionFrame                    = qt.QFrame(self.parent)
-    dataSelectionFrame.setLayout(qt.QGridLayout())
-    dataSelectionFormLayout.addWidget(dataSelectionFrame)
-
-    selectAll                             = qt.QRadioButton("Select All")
-    dataSelectionFrame.layout().addWidget(selectAll, 0, 0)
-
-    selectAllVolumes                      = qt.QRadioButton("Select All Volumes")
-    dataSelectionFrame.layout().addWidget(selectAllVolumes, 1, 0)
-
-    selectAllModels                       = qt.QRadioButton("Select All Models")
-    dataSelectionFrame.layout().addWidget(selectAllModels, 0, 1)
-
-    selectCustomized                      = qt.QRadioButton("Select From Drop List")
-    dataSelectionFrame.layout().addWidget(selectCustomized, 1, 1)
-
-    # TODO: add a data check list, enable to select the data from the list.
-    # Top three options should be 'Select All', 'Select All Volumes', 'Select All Models'
-
-    """    
+ 
     #
     # Layout Option Area
     #
@@ -165,17 +136,24 @@ class MosaicViewerWidget:
     changeLayoutFormLayout.addWidget(changeLayoutFrame)
 
     chooseDefault                             = qt.QRadioButton("Default Layout")
-    changeLayoutFrame.layout().addWidget(chooseDefault)
+    changeLayoutFormLayout.addWidget(chooseDefault)
     chooseDefault.setChecked(True)
 
     chooseCustomized                          = qt.QRadioButton("Customized Layout")
-    changeLayoutFrame.layout().addWidget(chooseCustomized)
+    changeLayoutFormLayout.addWidget(chooseCustomized)
 
     chooseRowFrame, chooseRowSlider, chooseRowSliderSpinBox = numericInputFrame(self.parent, "Number of Rows:     ", "Choose Number of Rows", 1, 20, 1, 0)
-    changeLayoutFrame.layout().addWidget(chooseRowFrame)
+    changeLayoutFormLayout.addWidget(chooseRowFrame)
 
     chooseColumnFrame, chooseColumnSlider, chooseColumnSliderSpinBox = numericInputFrame(self.parent, "Number of Columns:", "Choose Number of Columns", 1, 20, 1, 0)
-    changeLayoutFrame.layout().addWidget(chooseColumnFrame)
+    changeLayoutFormLayout.addWidget(chooseColumnFrame)
+
+    # sync camera button
+    self.syncCamButton         = qt.QPushButton("Sync Camera")
+    self.syncCamButton.toolTip = "Sync all the cameras"
+    self.syncCamButton.name     = "MosaicViewer SyncCam"
+    changeLayoutFormLayout.addWidget(self.syncCamButton)
+    self.syncCamButton.connect('clicked()', self.onSyncCam)
 
     class state(object):
       layoutMethod  = 'Default'
@@ -290,10 +268,10 @@ class MosaicViewerWidget:
       qt.QMessageBox.warning(slicer.util.mainWindow(),
           "Reload and Test", 'Exception!\n\n' + str(e) + "\n\nSee Python Console for Stack Trace")
 
-  # ------------------------------------------
-  # def onRenderAllNodes(self, pattern):
-  #   logic = MosaicViewerLogic()
-  #   logic.renderAllNodes(pattern)
+  #------------------------------------
+  def onSyncCam(self):
+    logic = MosaicViewerLogic()
+    logic.syncCam()
 
   # -----------------------------------
   def onRestore(self):
@@ -488,17 +466,6 @@ class MosaicViewerLogic:
 
       print '*************** Start loading the scene views ***************'
 
-      """ @ Deprecated
-      # get all model and fiber nodes from scene
-      scene = slicer.mrmlScene
-      scene_model_collection = scene.GetNodesByClass('vtkMRMLModelNode')
-      scene_fiber_collection = scene.GetNodesByClass('vtkMRMLFiberBundleNode')
-      n_scene_model          = scene_model_collection.GetNumberOfItems()
-      n_scene_fiber          = scene_fiber_collection.GetNumberOfItems()
-      iter_scene_model       = scene_model_collection.NewIterator()
-      iter_scene_fiber       = scene_fiber_collection.NewIterator()
-      """
-      
       print '------------------------------------------'
       if state is not None:
         print state.layoutMethod, 'Layout: ', state.nRows, ' * ', state.nColumns
@@ -522,15 +489,6 @@ class MosaicViewerLogic:
         print ' - Remove camera: ', cameraNodeToRemove.GetName()
         scene.RemoveNode(cameraNodeToRemove)
         
-      
-      # original number of view nodes for each display node, '0' means associated with all view nodes
-      # numberOfViews       = []
-      # print '--------------------------------'
-      # for d in range(n_scene_display):
-      #   displayi          = iter_scene_display.GetCurrentObject()
-      #   iter_scene_display.GoToNextItem()
-      #   numberOfViews.append(displayi.GetNumberOfViewNodeIDs())
-      #   print displayi.GetName(), ': ', numberOfViews[d]
 
       # Find loaded sceneviews
       nodes_dict = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
@@ -538,7 +496,7 @@ class MosaicViewerLogic:
       # Filter out the 'Slice Data Bundle Scene' which were saved at MRML file save point
       sv_nodes   = [n for n in nodes_dict.values() if "Slice" not in n.GetName()]
       
-      # Retun if no scene view
+      # Return if no scene view
       if len(sv_nodes) == 0 :
         return 
 
@@ -638,10 +596,10 @@ class MosaicViewerLogic:
         print ' Number of Camera Nodes:', nsvcamera
         
         for svc in range(nsvcamera):
-          sceneviewCameraNode         = sceneviewCameraNodeCollection.GetItemAsObject(svc)
+          sceneviewCameraNode = sceneviewCameraNodeCollection.GetItemAsObject(svc)
           if sceneviewCameraNode.GetActiveTag() == originalViewNode.GetID():
             print ' Found the camera node:    ', originalViewNode.GetID(), ' - ', sceneviewCameraNode.GetID()
-            c_sceneCameraNode         = scene.GetNodeByID(sceneCameraNode.GetID())
+            c_sceneCameraNode = scene.GetNodeByID(sceneCameraNode.GetID())
             c_sceneCameraNode.Copy(sceneviewCameraNode)
             c_sceneCameraNode.UpdateScene(scene)
             print ' Restore camera position:  ', sceneviewCameraNode.GetCamera().GetPosition()
@@ -649,29 +607,26 @@ class MosaicViewerLogic:
         # print 'Scene Camera Node Reference vs. Sceneview Camera Node Reference'
         # print sceneCameraNode.GetReferenceCount(),     ' vs. ', sceneviewCameraNode.GetReferenceCount()
 
-        """
-        # get the scene camera nodes and the sceneview camera node 
-        sceneview_node_collection       = c_sceneview.GetNodesByClass('vtkMRMLNode')
-        n_sceneview_node                = sceneview_node_collection.GetNumberOfItems()
-
-
-        for t in range(n_sceneview_camera):
-          node = sceneview_node_collection.GetItemAsObject(t)
-          sv_node = scene.GetNodeByID(node.GetID())
-          if sv_node is not None:
-            print '= ', sv_node.GetID()
-            sv_node.UpdateScene(scene)
-          else:
-            print '+ ', node.GetClassName()
-            sv_node = node.CreateNodeInstance()
-            sv_node.CopyWithScene(node)
-            scene.AddNode(sv_node)
-            sv_node.UpdateScene(scene)
-
-        # """
-        
-
+       
       print '*********** Finish loading all scene views *************'
+
+
+  def syncCam(self, camidx=1):
+    # This function will retrieve the camera node of the specific ViewNode to all the ViewNodes
+    scene = slicer.mrmlScene
+    sceneCameraCollection = scene.GetNodesByClass("vtkMRMLCameraNode")
+
+    # Get the node to be applied to all views
+    cam2apply = sceneCameraCollection.GetItemAsObject(camidx)
+
+    for i in range(sceneCameraCollection.GetNumberOfItems()):
+        if i != camidx:
+          camnode = sceneCameraCollection.GetItemAsObject(i)
+          camnode.Copy(cam2apply)
+          camnode.UpdateScene(scene)
+
+    print 'Finished applying the ', camidx,  '-th cammera to all views'
+
 
 # ================================================
 #

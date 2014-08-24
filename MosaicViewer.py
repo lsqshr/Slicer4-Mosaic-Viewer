@@ -115,7 +115,7 @@ class MosaicViewerWidget:
       # (use this during development, but remove it when delivering your module to users)
       # reload and run specific tests
       # scenarios                     = ('All', 'Model', 'Volume', 'SceneView_Simple', 'SceneView_Complex')
-      scenarios                     = ('SceneView_Simple', 'SceneView_Complex')
+      scenarios                     = ('SceneView_Simple', 'SceneView_Complex', 'SyncCam')
 
       for scenario in scenarios:
         button                      = qt.QPushButton("Reload and Test %s" % scenario)
@@ -154,28 +154,28 @@ class MosaicViewerWidget:
     #
     # Sync View Area
     #
-    syncViewCollapsibleButtion      = ctk.ctkCollapsibleButton()
-    syncViewCollapsibleButtion.text = 'synchronise all views'
-    self.layout.addWidget(syncViewCollapsibleButtion)
-    syncViewLayout                  = qt.QFormLayout(syncViewCollapsibleButtion)
+    SyncCamCollapsibleButtion      = ctk.ctkCollapsibleButton()
+    SyncCamCollapsibleButtion.text = 'synchronise all views'
+    self.layout.addWidget(SyncCamCollapsibleButtion)
+    SyncCamLayout                  = qt.QFormLayout(SyncCamCollapsibleButtion)
 
     # sync camera button
-    self.syncViewSelector                        = slicer.qMRMLNodeComboBox(syncViewCollapsibleButtion)
-    self.syncViewSelector.nodeTypes              = ( ("vtkMRMLViewNode"), "" )
-    self.syncViewSelector.selectNodeUponCreation = True
-    self.syncViewSelector.addEnabled             = False
-    self.syncViewSelector.removeEnabled          = False
-    self.syncViewSelector.noneEnabled            = False
-    self.syncViewSelector.showHidden             = False
-    self.syncViewSelector.showChildNodeTypes     = False
-    self.syncViewSelector.setMRMLScene( slicer.mrmlScene )
-    self.syncViewSelector.setToolTip( "Pick the view to be synchronised." )
-    syncViewLayout.addRow("View to synchronise", self.syncViewSelector) 
+    self.SyncCamSelector                        = slicer.qMRMLNodeComboBox(SyncCamCollapsibleButtion)
+    self.SyncCamSelector.nodeTypes              = ( ("vtkMRMLViewNode"), "" )
+    self.SyncCamSelector.selectNodeUponCreation = True
+    self.SyncCamSelector.addEnabled             = False
+    self.SyncCamSelector.removeEnabled          = False
+    self.SyncCamSelector.noneEnabled            = False
+    self.SyncCamSelector.showHidden             = False
+    self.SyncCamSelector.showChildNodeTypes     = False
+    self.SyncCamSelector.setMRMLScene( slicer.mrmlScene )
+    self.SyncCamSelector.setToolTip( "Pick the view to be synchronised." )
+    SyncCamLayout.addRow("View to synchronise", self.SyncCamSelector) 
 
     self.syncCamButton         = qt.QPushButton("Sync Camera")
     self.syncCamButton.toolTip = "Sync all the cameras"
     self.syncCamButton.name    = "MosaicViewer SyncCam"
-    syncViewLayout.addRow(self.syncCamButton)
+    SyncCamLayout.addRow(self.syncCamButton)
     self.syncCamButton.connect('clicked()', self.onSyncCam)
 
     class state(object):
@@ -294,7 +294,7 @@ class MosaicViewerWidget:
   #------------------------------------
   def onSyncCam(self):
     logic = MosaicViewerLogic()
-    logic.syncCam()
+    logic.syncCam(self.SyncCamSelector.currentNode())
 
   # -----------------------------------
   def onRestore(self):
@@ -573,9 +573,10 @@ class MosaicViewerLogic:
             # nodei                       = sv_nodei.CreateNodeInstance()
             # nodei.CopyWithScene(sv_nodei)
             scene.AddNode(sv_nodei)
-            print ' + Adding node  : ', sv_nodei.GetID()
+            #print ' + Adding node  : ', sv_nodei.GetID()
           else:
-            print ' = Existing node: ', sv_nodei.GetID()
+            #print ' = Existing node: ', sv_nodei.GetID()
+            pass
 
         # find the display models are in this scene view
         sceneview_display_collection    = c_sceneview.GetNodesByClass('vtkMRMLDisplayNode')
@@ -601,57 +602,83 @@ class MosaicViewerLogic:
           else:
             print ' * Missing node : ', slicei.GetID()
             s_slicei.RemoveThreeDViewID(viewID)
-
-
-        # copy the attributes of the original view nodes to the new view node
-        sceneview_view_collection       = c_sceneview.GetNodesByClass('vtkMRMLViewNode')
-        n_sceneview_view                = sceneview_view_collection.GetNumberOfItems()
-        originalViewNode                = sceneview_view_collection.GetItemAsObject(0)
-        # viewNode                        = scene.GetNodeByID(viewID)
-        # viewNode.Copy(originalViewNode)
-        # viewNode.SetName(viewName)
         
         # Restore the position
-        print '-------------------------------------------'
-        sceneCameraNode               = sceneCameraNodeCollection.GetItemAsObject(s)
+        print '-----------------Restore Cameras--------------------------'
+        sceneview_view_collection     = c_sceneview.GetNodesByClass('vtkMRMLViewNode')
+        svViewNode              = sceneview_view_collection.GetItemAsObject(0)
+        #sceneCameraNode               = sceneCameraNodeCollection.GetItemAsObject(s)
         sceneviewCameraNodeCollection = c_sceneview.GetNodesByClass('vtkMRMLCameraNode')
         nsvcamera                     = sceneviewCameraNodeCollection.GetNumberOfItems()
+
         print ' Number of Camera Nodes:', nsvcamera
         
+        svcam2restore = None
+
         for svc in range(nsvcamera):
           sceneviewCameraNode = sceneviewCameraNodeCollection.GetItemAsObject(svc)
-          if sceneviewCameraNode.GetActiveTag() == originalViewNode.GetID():
-            print ' Found the camera node:    ', originalViewNode.GetID(), ' - ', sceneviewCameraNode.GetID()
-            c_sceneCameraNode = scene.GetNodeByID(sceneCameraNode.GetID())
-            c_sceneCameraNode.Copy(sceneviewCameraNode)
-            c_sceneCameraNode.UpdateScene(scene)
-            print ' Restore camera position:  ', sceneviewCameraNode.GetCamera().GetPosition()
+          if sceneviewCameraNode.GetActiveTag() == svViewNode.GetID():
+            print ' Found the camera node in sceneview: ', svViewNode.GetName(), ' - ', sceneviewCameraNode.GetID()
+            svcam2restore = sceneviewCameraNode
+            break
 
-        # print 'Scene Camera Node Reference vs. Sceneview Camera Node Reference'
-        # print sceneCameraNode.GetReferenceCount(),     ' vs. ', sceneviewCameraNode.GetReferenceCount()
+        if svcam2restore == None:
+          raise Exception('No camera to restore for sceneview:' + c_sceneview.GetName() )
 
+        # Find the camera node of the current viewNode to apply 
+        scam2restore = None
+        viewNode = threeDView.mrmlViewNode()
+        for c in range(sceneCameraNodeCollection.GetNumberOfItems()):
+          cam = sceneCameraNodeCollection.GetItemAsObject(c)
+          if cam.GetActiveTag() == viewNode.GetID():
+            print ' Found the camera node in scene: ', viewNode.GetName(), ' - ', cam.GetID()
+            scam2restore = cam
+            break
+
+        if scam2restore == None:
+          raise Exception('No camera to restore for view:' + viewNode.GetName() )
+
+        scam2restore.Copy(svcam2restore)
+        scam2restore.SetActiveTag(viewNode.GetID())
+        scam2restore.UpdateScene(scene)
+        print ' Restore camera position: ', sceneviewCameraNode.GetCamera().GetPosition()
        
       print '*********** Finish loading all scene views *************'
 
+      print 'DEBUG:'
+      for c in range(sceneCameraNodeCollection.GetNumberOfItems()):
+        cam = sceneCameraNodeCollection.GetItemAsObject(c)
+        print cam.GetActiveTag()
 
-  def syncCam(self, camidx=1):
-    ncam = sceneCameraCollection.GetNumberOfItems()
-    if ncam <= camidx:
-      return
+  def syncCam(self, viewNode):
     # This function will retrieve the camera node of the specific ViewNode to all the ViewNodes
     scene = slicer.mrmlScene
     sceneCameraCollection = scene.GetNodesByClass("vtkMRMLCameraNode")
+    ncam = sceneCameraCollection.GetNumberOfItems()
 
+    cam2apply = None 
+    
+    print 'DEBUG find CAMNODE ========='
     # Get the node to be applied to all views
-    cam2apply = sceneCameraCollection.GetItemAsObject(camidx)
+    for i in range(ncam):
+      cam = sceneCameraCollection.GetItemAsObject(i)
+      print cam.GetActiveTag(), viewNode.GetID()
+      if cam.GetActiveTag() == viewNode.GetID():
+        cam2apply = cam 
+        break
+
+    print 'DEBUG end find CAMNODE======'
+
+    if cam2apply == None:
+      raise Exception('No camera node is attached to this view')
 
     for i in range(ncam):
-        if i != camidx:
-          camnode = sceneCameraCollection.GetItemAsObject(i)
-          camnode.Copy(cam2apply)
-          camnode.UpdateScene(scene)
-
-    print 'Finished applying the ', camidx,  '-th cammera to all views'
+        cam = sceneCameraCollection.GetItemAsObject(i)
+        atag = cam.GetActiveTag()
+        if atag != cam2apply.GetActiveTag():
+          cam.Copy(cam2apply)
+          cam.SetActiveTag(atag) # Restore the previous active tag
+          cam.UpdateScene(scene)
 
 
 # ================================================
@@ -700,6 +727,9 @@ class MosaicViewerTest(unittest.TestCase):
       self.test_MosaicViewer_SceneView('SeneView_Simple')      
     elif scenario == 'SceneView_Complex':
       self.test_MosaicViewer_SceneView('SeneView_Complex')      
+    elif scenario == 'SyncCam':
+      self.test_MosaicViewer_SceneView('SeneView_Complex')      
+      self.test_MosaicViewer_SyncCam()      
     elif scenario == 'All':
       self.test_MosaicViewer_All()
     else:
@@ -793,4 +823,34 @@ class MosaicViewerTest(unittest.TestCase):
     logic = MosaicViewerLogic()
     logic.renderAllSceneViewNodes()
 
+  def test_MosaicViewer_SyncCam(self):
+    import random
 
+    # Load some dummy sceneviews
+    scene = slicer.mrmlScene
+    cams  = scene.GetNodesByClass('vtkMRMLCameraNode')
+    ncam  = cams.GetNumberOfItems()
+    views = scene.GetNodesByClass('vtkMRMLViewNode')
+
+    # Distort the first camera 
+    view1 = views.GetItemAsObject(0)
+    view2 = views.GetItemAsObject(1)
+    views2test = []
+    views2test.append(view1)
+    views2test.append(view2)
+
+    logic = MosaicViewerLogic()
+    for vidx, view in enumerate(views2test):
+      cam2distort = None
+
+      for i in range(ncam):
+        cam = cams.GetItemAsObject(i)
+        if cam.GetActiveTag() == view.GetID():
+          cam2distort = cam
+          break
+
+      self.delayDisplay('Distort view %d' % vidx, 2000)
+      cam2distort.SetPosition(random.uniform(0,500), random.uniform(0,500), random.uniform(0,500))
+      self.delayDisplay('Sync all to view %d' % vidx, 2000)
+      cam2distort.UpdateScene(scene)
+      logic.syncCam(view)

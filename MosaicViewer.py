@@ -142,17 +142,40 @@ class MosaicViewerWidget:
     chooseCustomized                          = qt.QRadioButton("Customized Layout")
     changeLayoutFormLayout.addWidget(chooseCustomized)
 
-    chooseRowFrame, chooseRowSlider, chooseRowSliderSpinBox = numericInputFrame(self.parent, "Number of Rows:     ", "Choose Number of Rows", 1, 20, 1, 0)
+    chooseRowFrame, chooseRowSlider, chooseRowSliderSpinBox = numericInputFrame(self.parent, 
+                                                              "Number of Rows:     ", "Choose Number of Rows", 1, 20, 1, 0)
     changeLayoutFormLayout.addWidget(chooseRowFrame)
 
-    chooseColumnFrame, chooseColumnSlider, chooseColumnSliderSpinBox = numericInputFrame(self.parent, "Number of Columns:", "Choose Number of Columns", 1, 20, 1, 0)
+    chooseColumnFrame, chooseColumnSlider, chooseColumnSliderSpinBox = numericInputFrame(self.parent, 
+                                                                                         "Number of Columns:", 
+                                                                                         "Choose Number of Columns", 1, 20, 1, 0)
     changeLayoutFormLayout.addWidget(chooseColumnFrame)
 
+    #
+    # Sync View Area
+    #
+    syncViewCollapsibleButtion      = ctk.ctkCollapsibleButton()
+    syncViewCollapsibleButtion.text = 'synchronise all views'
+    self.layout.addWidget(syncViewCollapsibleButtion)
+    syncViewLayout                  = qt.QFormLayout(syncViewCollapsibleButtion)
+
     # sync camera button
+    self.syncViewSelector                        = slicer.qMRMLNodeComboBox(syncViewCollapsibleButtion)
+    self.syncViewSelector.nodeTypes              = ( ("vtkMRMLViewNode"), "" )
+    self.syncViewSelector.selectNodeUponCreation = True
+    self.syncViewSelector.addEnabled             = False
+    self.syncViewSelector.removeEnabled          = False
+    self.syncViewSelector.noneEnabled            = False
+    self.syncViewSelector.showHidden             = False
+    self.syncViewSelector.showChildNodeTypes     = False
+    self.syncViewSelector.setMRMLScene( slicer.mrmlScene )
+    self.syncViewSelector.setToolTip( "Pick the view to be synchronised." )
+    syncViewLayout.addRow("View to synchronise", self.syncViewSelector) 
+
     self.syncCamButton         = qt.QPushButton("Sync Camera")
     self.syncCamButton.toolTip = "Sync all the cameras"
-    self.syncCamButton.name     = "MosaicViewer SyncCam"
-    changeLayoutFormLayout.addWidget(self.syncCamButton)
+    self.syncCamButton.name    = "MosaicViewer SyncCam"
+    syncViewLayout.addRow(self.syncCamButton)
     self.syncCamButton.connect('clicked()', self.onSyncCam)
 
     class state(object):
@@ -612,6 +635,9 @@ class MosaicViewerLogic:
 
 
   def syncCam(self, camidx=1):
+    ncam = sceneCameraCollection.GetNumberOfItems()
+    if ncam <= camidx:
+      return
     # This function will retrieve the camera node of the specific ViewNode to all the ViewNodes
     scene = slicer.mrmlScene
     sceneCameraCollection = scene.GetNodesByClass("vtkMRMLCameraNode")
@@ -619,7 +645,7 @@ class MosaicViewerLogic:
     # Get the node to be applied to all views
     cam2apply = sceneCameraCollection.GetItemAsObject(camidx)
 
-    for i in range(sceneCameraCollection.GetNumberOfItems()):
+    for i in range(ncam):
         if i != camidx:
           camnode = sceneCameraCollection.GetItemAsObject(i)
           camnode.Copy(cam2apply)

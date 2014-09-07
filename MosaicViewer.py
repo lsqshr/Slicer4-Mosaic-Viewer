@@ -24,8 +24,8 @@ class MosaicViewer:
 
     self.parent = parent
 
-    # Add this test to the SelfTest module's list for discovery when the module
-    # is created.  Since this module may be discovered before SelfTests itself,
+    # Add this test to the SelfTest module's list for disscovery when the module
+    # is created.  Since this module may be disscovered before SelfTests itself,
     # create the list if it doesn't already exist.
     try:
       slicer.selfTests
@@ -114,8 +114,8 @@ class MosaicViewerWidget:
       # reload and test button
       # (use this during development, but remove it when delivering your module to users)
       # reload and run specific tests
-      # scenarios                     = ('All', 'Model', 'Volume', 'SceneView_Simple', 'SceneView_Complex')
-      scenarios                     = ('SceneView_Simple', 'SceneView_Complex', 'SyncCam')
+      # scenarios                     = ('All', 'Model', 'Volume', 'sceneViewSimple', 'sceneViewComplex')
+      scenarios                     = ('sceneViewSimple', 'sceneViewComplex', 'syncCam')
 
       for scenario in scenarios:
         button                      = qt.QPushButton("Reload and Test %s" % scenario)
@@ -154,42 +154,42 @@ class MosaicViewerWidget:
     #
     # Sync View Area
     #
-    SyncCamCollapsibleButtion      = ctk.ctkCollapsibleButton()
-    SyncCamCollapsibleButtion.text = 'synchronise all views'
-    self.layout.addWidget(SyncCamCollapsibleButtion)
-    SyncCamLayout                  = qt.QFormLayout(SyncCamCollapsibleButtion)
+    syncCamCollapsibleButtion      = ctk.ctkCollapsibleButton()
+    syncCamCollapsibleButtion.text = 'synchronise all views'
+    self.layout.addWidget(syncCamCollapsibleButtion)
+    syncCamLayout                  = qt.QFormLayout(syncCamCollapsibleButtion)
 
     # sync camera button
-    self.SyncCamSelector                        = slicer.qMRMLNodeComboBox(SyncCamCollapsibleButtion)
-    self.SyncCamSelector.nodeTypes              = ( ("vtkMRMLViewNode"), "" )
-    self.SyncCamSelector.selectNodeUponCreation = True
-    self.SyncCamSelector.addEnabled             = False
-    self.SyncCamSelector.removeEnabled          = False
-    self.SyncCamSelector.noneEnabled            = False
-    self.SyncCamSelector.showHidden             = False
-    self.SyncCamSelector.showChildNodeTypes     = False
-    self.SyncCamSelector.setMRMLScene( slicer.mrmlScene )
-    self.SyncCamSelector.setToolTip( "Pick the view to be synchronised." )
-    SyncCamLayout.addRow("View to synchronise", self.SyncCamSelector) 
+    self.syncCamSelector                        = slicer.qMRMLNodeComboBox(syncCamCollapsibleButtion)
+    self.syncCamSelector.nodeTypes              = ( ("vtkMRMLViewNode"), "" )
+    self.syncCamSelector.selectNodeUponCreation = True
+    self.syncCamSelector.addEnabled             = False
+    self.syncCamSelector.removeEnabled          = False
+    self.syncCamSelector.noneEnabled            = False
+    self.syncCamSelector.showHidden             = False
+    self.syncCamSelector.showChildNodeTypes     = False
+    self.syncCamSelector.setMRMLScene( slicer.mrmlScene )
+    self.syncCamSelector.setToolTip( "Pick the view to be synchronised." )
+    syncCamLayout.addRow("View to synchronise", self.syncCamSelector) 
 
     self.syncCamButton         = qt.QPushButton("Sync Camera")
     self.syncCamButton.toolTip = "Sync all the cameras"
-    self.syncCamButton.name    = "MosaicViewer SyncCam"
-    SyncCamLayout.addRow(self.syncCamButton)
-    self.syncCamButton.connect('clicked()', self.onSyncCam)
+    self.syncCamButton.name    = "MosaicViewer syncCam"
+    syncCamLayout.addRow(self.syncCamButton)
+    self.syncCamButton.connect('clicked()', self.onsyncCam)
 
     class state(object):
       layoutMethod  = 'Default'
       nRows         = 1
       nColumns      = 1
 
-    scope_locals    = locals()
+    scopeLocals    = locals()
 
     def connect(obj, evt, cmd):
       def callback(*args):
-        current_locals = scope_locals.copy()
-        current_locals.update({'args':args})
-        exec cmd in globals(), current_locals
+        currentLocals = scopeLocals.copy()
+        currentLocals.update({'args':args})
+        exec cmd in globals(), currentLocals
         updateGUI()
       obj.connect(evt, callback)
 
@@ -292,9 +292,9 @@ class MosaicViewerWidget:
           "Reload and Test", 'Exception!\n\n' + str(e) + "\n\nSee Python Console for Stack Trace")
 
   #------------------------------------
-  def onSyncCam(self):
+  def onsyncCam(self):
     logic = MosaicViewerLogic()
-    logic.syncCam(self.SyncCamSelector.currentNode())
+    logic.syncCam(self.syncCamSelector.currentNode())
 
   # -----------------------------------
   def onRestore(self):
@@ -340,7 +340,7 @@ class MosaicViewerLogic:
   def makeLayout(self, nNodes, sceneviewNames, nRows = 1, nColumns = 1):
     
     import math
-    # make an default display layout array, e.g.:
+    # make an default dissplay layout array, e.g.:
     # nvolumes = 3 -> 2 x 2 (nrows = ncolumes, with only one volume in second row)
     # nvolumes = 5 -> 2 x 3 (nrows < ncolumes, with only two volumes in second row)
     # nvoluems = 11 -> 3 x 4 (nrows < ncolums, with only three volumes in the third row)
@@ -408,29 +408,29 @@ class MosaicViewerLogic:
       threeDView = threeDWidget.threeDView() 
       viewNode = threeDView.mrmlViewNode()
 
-      # use volumerendering module to make the volume rendering display node
+      # use volumerendering module to make the volume rendering dissplay node
       if nodeType == "Volume":
         logic = slicer.modules.volumerendering.logic()
-        displayNode = logic.CreateVolumeRenderingDisplayNode()
-        slicer.mrmlScene.AddNode(displayNode)
-        displayNode.UnRegister(logic)
-        displayNode.AddViewNodeID(viewNode.GetID())
-        logic.UpdateDisplayNodeFromVolumeNode(displayNode, nodeID)
-        displayNode.SetVisibility(True)
-        nodeID.AddAndObserveDisplayNodeID(displayNode.GetID())
+        dissplayNode = logic.CreateVolumeRenderingdissplayNode()
+        slicer.mrmlScene.AddNode(dissplayNode)
+        dissplayNode.UnRegister(logic)
+        dissplayNode.AddViewNodeID(viewNode.GetID())
+        logic.UpdatedissplayNodeFromVolumeNode(dissplayNode, nodeID)
+        dissplayNode.SetVisibility(True)
+        nodeID.AddAndObservedissplayNodeID(dissplayNode.GetID())
       elif nodeType == "Model":
-        # use models module to render the display node of this model
-        displayNode = nodeID.GetDisplayNode()
-        # slicer.mrmlScene.AddNode(displayNode)
-        nodeID.AddAndObserveDisplayNodeID(displayNode.GetID())
-        displayNode.AddViewNodeID(viewNode.GetID())
-        displayNode.SetVisibility(True)
+        # use models module to render the dissplay node of this model
+        dissplayNode = nodeID.GetdissplayNode()
+        # slicer.mrmlScene.AddNode(dissplayNode)
+        nodeID.AddAndObservedissplayNodeID(dissplayNode.GetID())
+        dissplayNode.AddViewNodeID(viewNode.GetID())
+        dissplayNode.SetVisibility(True)
       else:
         raise Exception("Unknown Node Type")
 
       print "Node Index: ", index, '\nView Node ID: ', viewNode.GetID(),\
-         '\nView Name: ', viewName, '\nDisplay Node Visible:', \
-         displayNode.GetVisibility(), '\n'
+         '\nView Name: ', viewName, '\ndissplay Node Visible:', \
+         dissplayNode.GetVisibility(), '\n'
 
       threeDNodesByViewName[viewName] = threeDView
 
@@ -443,8 +443,8 @@ class MosaicViewerLogic:
     Search all models which are currently loaded in the mrml scene and 
     render them in the a grid view
     '''
-    nodesDict = slicer.util.getNodes(pattern)
-    nodes = [n for n in nodesDict.values() if "Slice" not in n.GetName()]
+    nodesdisct = slicer.util.getNodes(pattern)
+    nodes = [n for n in nodesdisct.values() if "Slice" not in n.GetName()]
     nodeType = lambda nt: "Model" if pattern == 'vtkMRMLModelNode*' else "Volume" 
     self.viewerPerNode(nodes = nodes, sceneviewNames = [n.GetName() for n in nodes], nodeType = nodeType(pattern))
 
@@ -468,18 +468,18 @@ class MosaicViewerLogic:
     return len(lViewNode.keys()) - (nSceneViewNode - sceneViewIndex)
 
   # ------------------------------------------
-  def _getCamera(self, sv_nodes, nodes_dict, sceneviewNames):
+  def _getCamera(self, svNodes, nodesdisct, sceneviewNames):
     """
     Extract the camera nodes from the scene views
     """
     cameraNodeCollection              = [] # cameraNode collection
-    for s in range(len(sv_nodes)):
-      c_sceneview                     = nodes_dict[sceneviewNames[s]] 
-      sceneviewCameraNode             = c_sceneview.GetNodesByClass('vtkMRMLCameraNode').GetItemAsObject(0)
+    for s in range(len(svNodes)):
+      cSceneView                     = nodesdisct[sceneviewNames[s]] 
+      sceneviewCameraNode             = cSceneView.GetNodesByClass('vtkMRMLCameraNode').GetItemAsObject(0)
       newCameraNode                   = sceneviewCameraNode.CreateNodeInstance()
       newCameraNode.Copy(sceneviewCameraNode)
       cameraNodeCollection.append(newCameraNode)
-    for i in range(len(sv_nodes)):
+    for i in range(len(svNodes)):
       print '= Camera Position: ', i, ' ', cameraNodeCollection[i].GetCamera().GetPosition()
 
     return cameraNodeCollection
@@ -487,7 +487,7 @@ class MosaicViewerLogic:
   # ------------------------------------------
   def renderAllSceneViewNodes(self, state = None):
 
-      print '*************** Start loading the scene views ***************'
+      print '*************** Start loadisng the scene views ***************'
 
       print '------------------------------------------'
       if state is not None:
@@ -495,7 +495,7 @@ class MosaicViewerLogic:
         self.makeLayout(1, 'dummy', 1, 1)
 
     
-      # new implementation using vtkMRMLModelDisplayNode instead of vtkMRMLModelNode
+      # new implementation using vtkMRMLModeldissplayNode instead of vtkMRMLModelNode
       scene                     = slicer.mrmlScene
 
       # remove all previous view nodes
@@ -514,27 +514,27 @@ class MosaicViewerLogic:
         
 
       # Find loaded sceneviews
-      nodes_dict = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
+      nodesdisct = slicer.util.getNodes('*vtkMRMLSceneViewNode*')
       
       # Filter out the 'Slice Data Bundle Scene' which were saved at MRML file save point
-      sv_nodes   = [n for n in nodes_dict.values() if "Slice" not in n.GetName()]
+      svNodes   = [n for n in nodesdisct.values() if "Slice" not in n.GetName()]
       
       # Return if no scene view
-      if len(sv_nodes) == 0 :
+      if len(svNodes) == 0 :
         return 
 
       # Scene view names, sorted in alphabetical order
-      sceneviewNames = [n.GetName() for n in sv_nodes]
+      sceneviewNames = [n.GetName() for n in svNodes]
       sceneviewNames.sort()
 
       # extract the camera nodes and add to the scene, must be done before making layout
-      # cameraNodeCollection              = self._getCamera(sv_nodes, nodes_dict, sceneviewNames)
+      # cameraNodeCollection              = self._getCamera(svNodes, nodesdisct, sceneviewNames)
       
-      # Make the layout according to the # scene view nodes
+      # Make the layout accordisng to the # scene view nodes
       if state is None or state.layoutMethod == 'Default':
-        self.makeLayout(len(sv_nodes), sceneviewNames)
+        self.makeLayout(len(svNodes), sceneviewNames)
       else:
-        self.makeLayout(len(sv_nodes), sceneviewNames, state.nRows, state.nColumns)
+        self.makeLayout(len(svNodes), sceneviewNames, state.nRows, state.nColumns)
 
       layoutManager                     = slicer.app.layoutManager()
       nview                             = layoutManager.threeDViewCount 
@@ -552,46 +552,47 @@ class MosaicViewerLogic:
         threeDViewMap[viewNode.GetName()] = threeDView   
 
       # iterate all loaded scene view nodes
-      for s in range(len(sv_nodes)):
+      for s in range(len(svNodes)):
 
         # get current sceneview
-        # c_sceneview                = sv_nodes[s]
-        c_sceneview           = nodes_dict[sceneviewNames[s]] 
+        # cSceneView                = svNodes[s]
+        cSceneView           = nodesdisct[sceneviewNames[s]] 
         # find the view with the same name as the sceneview
-        viewName              = 'View' + c_sceneview.GetName()
+        viewName              = 'View' + cSceneView.GetName()
         viewID                = viewMap[viewName]
         threeDView            = threeDViewMap[viewName]
         
         # add nodes in sceneview to scene
         print '-------------------------------------------'
-        sceneview_node_collection       = c_sceneview.GetNodesByClass('vtkMRMLNode')
-        n_sceneview_node                = sceneview_node_collection.GetNumberOfItems()
+        sceneviewNodeCollection = cSceneView.GetNodesByClass('vtkMRMLNode')
+        n_sceneview_node        = sceneviewNodeCollection.GetNumberOfItems()
 
         for n in range(n_sceneview_node):
-          sv_nodei                      = sceneview_node_collection.GetItemAsObject(n)
+          sv_nodei                      = sceneviewNodeCollection.GetItemAsObject(n)
           if scene.GetNodeByID(sv_nodei.GetID()) is None:
             # nodei                       = sv_nodei.CreateNodeInstance()
             # nodei.CopyWithScene(sv_nodei)
             scene.AddNode(sv_nodei)
-            #print ' + Adding node  : ', sv_nodei.GetID()
+            #print ' + Addisng node  : ', sv_nodei.GetID()
           else:
             #print ' = Existing node: ', sv_nodei.GetID()
             pass
 
-        # find the display models are in this scene view
-        sceneview_display_collection    = c_sceneview.GetNodesByClass('vtkMRMLDisplayNode')
-        n_sceneview_display             = sceneview_display_collection.GetNumberOfItems()
-        for d in range(n_sceneview_display):
-          displayi                      = sceneview_display_collection.GetItemAsObject(d)
-          s_displayi                    = scene.GetNodeByID(displayi.GetID())
-          if displayi.GetVisibility():
-            s_displayi.AddViewNodeID(viewID)
-            s_displayi.SetVisibility(1)
+        # find the dissplay models are in this scene view
+        sceneviewdissplayCollection    = cSceneView.GetNodesByClass('vtkMRMLdissplayNode')
+        nSceneviewdissplay             = sceneviewdissplayCollection.GetNumberOfItems()
+
+        for d in range(nSceneviewdissplay):
+          dis   = sceneviewdissplayCollection.GetItemAsObject(d)
+          disInScene = scene.GetNodeByID(dis.GetID())
+          if dis.GetVisibility():
+            disInScene.AddViewNodeID(viewID)
+            disInScene.SetVisibility(1)
           else:
-            s_displayi.RemoveViewNodeID(viewID)
+            disInScene.RemoveViewNodeID(viewID)
 
         # find the 2D slices in the scene view
-        sceneview_slice_collection      = c_sceneview.GetNodesByClass('vtkMRMLSliceNode')
+        sceneview_slice_collection      = cSceneView.GetNodesByClass('vtkMRMLSliceNode')
         n_sceneview_slice               = sceneview_slice_collection.GetNumberOfItems()
         for d in range(n_sceneview_slice):
           slicei                        = sceneview_slice_collection.GetItemAsObject(d)
@@ -605,10 +606,10 @@ class MosaicViewerLogic:
         
         # Restore the position
         print '-----------------Restore Cameras--------------------------'
-        sceneview_view_collection     = c_sceneview.GetNodesByClass('vtkMRMLViewNode')
+        sceneview_view_collection     = cSceneView.GetNodesByClass('vtkMRMLViewNode')
         svViewNode              = sceneview_view_collection.GetItemAsObject(0)
         #sceneCameraNode               = sceneCameraNodeCollection.GetItemAsObject(s)
-        sceneviewCameraNodeCollection = c_sceneview.GetNodesByClass('vtkMRMLCameraNode')
+        sceneviewCameraNodeCollection = cSceneView.GetNodesByClass('vtkMRMLCameraNode')
         nsvcamera                     = sceneviewCameraNodeCollection.GetNumberOfItems()
 
         print ' Number of Camera Nodes:', nsvcamera
@@ -623,7 +624,7 @@ class MosaicViewerLogic:
             break
 
         if svcam2restore == None:
-          raise Exception('No camera to restore for sceneview:' + c_sceneview.GetName() )
+          raise Exception('No camera to restore for sceneview:' + cSceneView.GetName() )
 
         # Find the camera node of the current viewNode to apply 
         scam2restore = None
@@ -643,7 +644,7 @@ class MosaicViewerLogic:
         scam2restore.UpdateScene(scene)
         print ' Restore camera position: ', sceneviewCameraNode.GetCamera().GetPosition()
        
-      print '*********** Finish loading all scene views *************'
+      print '*********** Finish loadisng all scene views *************'
 
       print 'DEBUG:'
       for c in range(sceneCameraNodeCollection.GetNumberOfItems()):
@@ -690,8 +691,8 @@ class MosaicViewerTest(unittest.TestCase):
   This is the test case for your scripted module.
   """ 
   # -------------------------------
-  def delayDisplay(self,message,msec = 1500):
-    """This utility method displays a small dialog and waits.
+  def delaydissplay(self,message,msec = 1500):
+    """This utility method dissplays a small disalog and waits.
     This does two things: 1) it lets the event loop catch up
     to the state of the test so that rendering and widget updates
     have all taken place before the test continues and 2) it
@@ -699,7 +700,7 @@ class MosaicViewerTest(unittest.TestCase):
     so that we'll know when it breaks.
     """
     print(message)
-    self.info = qt.QDialog()
+    self.info = qt.Qdialog()
     self.infoLayout = qt.QVBoxLayout()
     self.info.setLayout(self.infoLayout)
     self.label = qt.QLabel(message,self.info)
@@ -720,30 +721,30 @@ class MosaicViewerTest(unittest.TestCase):
     self.setUp()
 
     if scenario   == "Volume":
-      self.test_MosaicViewer_Volume()
+      self.testMosaicViewerVolume()
     elif scenario == "Model":
-      self.test_MosaicViewer_Model()
-    elif scenario == 'SceneView_Simple':
-      self.test_MosaicViewer_SceneView('SeneView_Simple')      
-    elif scenario == 'SceneView_Complex':
-      self.test_MosaicViewer_SceneView('SeneView_Complex')      
-    elif scenario == 'SyncCam':
-      self.test_MosaicViewer_SceneView('SeneView_Complex')      
-      self.test_MosaicViewer_SyncCam()      
+      self.testMosaicViewerModel()
+    elif scenario == 'sceneViewSimple':
+      self.testMosaicViewerSceneView('SeneView_Simple')      
+    elif scenario == 'sceneViewComplex':
+      self.testMosaicViewerSceneView('SeneView_Complex')      
+    elif scenario == 'syncCam':
+      self.testMosaicViewerSceneView('SeneView_Complex')      
+      self.testMosaicViewerSyncCam()      
     elif scenario == 'All':
-      self.test_MosaicViewer_All()
+      self.testMosaicViewerAll()
     else:
-      self.test_MosaicViewer_All()
+      self.testMosaicViewerAll()
 
   # -------------------------------------
-  def test_MosaicViewer_All(self):
-      self.test_MosaicViewer_Volume()
-      self.test_MosaicViewer_Model()
-      self.test_MosaicViewer_SceneView('SceneView_Simple')
-      self.test_MosaicViewer_SceneView('SceneView_Complex')
+  def testMosaicViewerAll(self):
+      self.testMosaicViewerVolume()
+      self.testMosaicViewerModel()
+      self.testMosaicViewerSceneView('sceneViewSimple')
+      self.testMosaicViewerSceneView('sceneViewComplex')
 
   # ----------------------------------------
-  def test_MosaicViewer_Volume(self):
+  def testMosaicViewerVolume(self):
     """ Test modes with 7 volumes.
     """
     m = slicer.util.mainWindow()
@@ -752,16 +753,16 @@ class MosaicViewerTest(unittest.TestCase):
     volumes = []
     volumeNames = []
 
-    self.delayDisplay("Starting the test, loading data")
+    self.delaydissplay("Starting the test, loadisng data")
 
     fPath = eval('slicer.modules.mosaicviewer.path')
-    fDir = os.path.dirname(fPath) + '/Resources/SampleVolumes'
+    fdir = os.path.dirname(fPath) + '/Resources/SampleVolumes'
 
-    for f in os.listdir(fDir):
+    for f in os.listdisr(fdir):
       if f.endswith(".nrrd"):
-          slicer.util.loadVolume(fDir + '/' + f)
+          slicer.util.loadVolume(fdir + '/' + f)
           fName, fExtension = os.path.splitext(f)
-          print "loading " + fName
+          print "loadisng " + fName
           volumes.append(fName)
           volumeNames.append(fName)
 
@@ -769,24 +770,24 @@ class MosaicViewerTest(unittest.TestCase):
     logic.viewerPerNode(nodes = volumes, sceneviewNames = volumeNames, nodeType = "Volume")
 
   # --------------------------------------
-  def test_MosaicViewer_Model(self):
+  def testMosaicViewerModel(self):
     m = slicer.util.mainWindow()
     m.moduleSelector().selectModule('MosaicViewer')
 
     models = []
     modelNames = []
 
-    self.delayDisplay("Starting the test, loading data")
+    self.delaydissplay("Starting the test, loadisng data")
 
     fPath = eval('slicer.modules.mosaicviewer.path')
 
-    fDir = os.path.dirname(fPath) + '/Resources/SampleModels'
+    fdir = os.path.dirname(fPath) + '/Resources/SampleModels'
 
-    for f in os.listdir(fDir):
+    for f in os.listdisr(fdir):
       if f.endswith(".vtk"):
-          slicer.util.loadModel(fDir + '/' + f)
+          slicer.util.loadModel(fdir + '/' + f)
           fName, fExtension = os.path.splitext(f)
-          print "loading " + fName
+          print "loadisng " + fName
           models.append(slicer.util.getNode(fName))
           modelNames.append(fName)
 
@@ -794,7 +795,7 @@ class MosaicViewerTest(unittest.TestCase):
     logic.viewerPerNode(nodes = models, sceneviewNames = modelNames, nodeType = "Model")
 
   # -------------------------------------
-  def test_MosaicViewer_SceneView(self, sub_scenario):
+  def testMosaicViewerSceneView(self, subScenario):
     
     self.setUp()
 
@@ -804,26 +805,26 @@ class MosaicViewerTest(unittest.TestCase):
     sceneViews = []
     svNames = []
 
-    self.delayDisplay("Starting the test, loading data")
+    self.delaydissplay("Starting the test, loadisng data")
 
     fPath = eval('slicer.modules.mosaicviewer.path')
-    if sub_scenario == 'SeneView_Simple':
-      fDir = os.path.dirname(fPath) + '/Resources/SampleSceneViewsSimple'
-    elif sub_scenario == 'SeneView_Complex':
-      fDir = os.path.dirname(fPath) + '/Resources/SampleSceneViewsComplex'
+    if subScenario == 'SeneView_Simple':
+      fdir = os.path.dirname(fPath) + '/Resources/SampleSceneViewsSimple'
+    elif subScenario == 'SeneView_Complex':
+      fdir = os.path.dirname(fPath) + '/Resources/SampleSceneViewsComplex'
 
-    for f in os.listdir(fDir):
+    for f in os.listdisr(fdir):
       if f.endswith(".mrb"):
-        slicer.util.loadScene(fDir + '/' + f)
+        slicer.util.loadScene(fdir + '/' + f)
         fName, fExtension = os.path.splitext(f)
-        print "loading " + fName
+        print "loadisng " + fName
         sceneViews.append(slicer.util.getNode(fName))
         svNames.append(fName)
 
     logic = MosaicViewerLogic()
     logic.renderAllSceneViewNodes()
 
-  def test_MosaicViewer_SyncCam(self):
+  def testMosaicViewerSyncCam(self):
     import random
 
     # Load some dummy sceneviews
@@ -832,7 +833,7 @@ class MosaicViewerTest(unittest.TestCase):
     ncam  = cams.GetNumberOfItems()
     views = scene.GetNodesByClass('vtkMRMLViewNode')
 
-    # Distort the first camera 
+    # disstort the first camera 
     view1 = views.GetItemAsObject(0)
     view2 = views.GetItemAsObject(1)
     views2test = []
@@ -841,16 +842,16 @@ class MosaicViewerTest(unittest.TestCase):
 
     logic = MosaicViewerLogic()
     for vidx, view in enumerate(views2test):
-      cam2distort = None
+      cam2disstort = None
 
       for i in range(ncam):
         cam = cams.GetItemAsObject(i)
         if cam.GetActiveTag() == view.GetID():
-          cam2distort = cam
+          cam2disstort = cam
           break
 
-      self.delayDisplay('Distort view %d' % vidx, 2000)
-      cam2distort.SetPosition(random.uniform(0,500), random.uniform(0,500), random.uniform(0,500))
-      self.delayDisplay('Sync all to view %d' % vidx, 2000)
-      cam2distort.UpdateScene(scene)
+      self.delaydissplay('disstort view %d' % vidx, 2000)
+      cam2disstort.SetPosition(random.uniform(0,500), random.uniform(0,500), random.uniform(0,500))
+      self.delaydissplay('Sync all to view %d' % vidx, 2000)
+      cam2disstort.UpdateScene(scene)
       logic.syncCam(view)
